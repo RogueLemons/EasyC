@@ -15,3 +15,4 @@ Includes
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include
 - cannot use * without whitespace after unless dereferencing (*some_ptr is ok)
+- cannot typedef and define struct in same statement
