@@ -1,4 +1,4 @@
-# EasyC (Prototype)
+# EasyC (Proof-of-Concept Prototype)
 Ease-of-life features added in a simple superset to C
 
 Includes
