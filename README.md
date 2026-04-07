@@ -12,6 +12,7 @@ Includes
 - keyword **cleanpop**: variable initialized with cleanpop automatically calls POPULATE__type(t) on next line and before scope exits (and before return statements) calls CLEANUP__type(t), must be defined as functions or macros manually
 - keyword **typenum**: a typesafe enum, struct type { int value; }; under hood with macro definitions for values, if type has option = 5 then type::option is just macro defined type__option (const type)({ .value = 5}), type::count added for bonus help
 - invert keyword **safe** so everything is safe by default and make user use keyword **nullable** for pointers that may be null
+- convert .eh and .ec file includes to .h and .c
 
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include
