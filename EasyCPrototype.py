@@ -670,7 +670,7 @@ def insert_nullcheck_macro_after_line(line_number, code):
         "#define EC__NULL__CHECK(x) \\\n"
         "    do { \\\n"
         "        if ((x) == NULL) { \\\n"
-        "            printf(\"File %s - Line %d had illegal null pointer, now exiting...\\n\", __FILE__, __LINE__); \\\n"
+        "            fprintf(stderr, \"File %s - Line %d had illegal null pointer, now exiting...\\n\", __FILE__, __LINE__); \\\n"
         "            exit(1); \\\n"
         "        } \\\n"
         "    } while(0)\n"
@@ -709,18 +709,129 @@ def process_safe_pointers(code):
     return code
 
 # -----------------------------
+# Add typenum for typesafe enums
+# -----------------------------
+def transform_typenum(code):
+    """
+    Transforms 'typenum' declarations into:
+    - struct + typedef
+    - #defines for each value
+    - #define TypeName__count N
+
+    Raises ValueError if:
+    - any entry lacks '='
+    - duplicate numeric values are found
+    - duplicate names are found
+    - no values exist
+    """
+
+    pattern = re.compile(
+        r'typenum\s+([A-Za-z_][A-Za-z0-9_]*)\s*{(.*?)}\s*;',
+        re.DOTALL
+    )
+
+    def replacer(match):
+        type_name = match.group(1)
+        body = match.group(2).strip()
+
+        values = [v.strip() for v in body.split(',') if v.strip()]
+
+        # 🚨 Empty typenum
+        if len(values) == 0:
+            raise ValueError(f"Typenum '{type_name}' has no values")
+
+        defines = []
+        seen_values = {}   # num -> name
+        seen_names = set() # value names
+
+        for v in values:
+            if '=' not in v:
+                raise ValueError(
+                    f"Typenum '{type_name}' has invalid entry (missing '='): {v}"
+                )
+
+            name_part, value_part = v.split('=', 1)
+            value_name = name_part.strip()
+            num = value_part.strip()
+
+            # 🚨 Duplicate name check
+            if value_name in seen_names:
+                raise ValueError(
+                    f"Typenum '{type_name}' has duplicate name: '{value_name}'"
+                )
+            seen_names.add(value_name)
+
+            # 🚨 Duplicate numeric value check
+            if num in seen_values:
+                raise ValueError(
+                    f"Typenum '{type_name}' has duplicate value '{num}' "
+                    f"for '{value_name}' and '{seen_values[num]}'"
+                )
+            seen_values[num] = value_name
+
+            defines.append(
+                f"#define {type_name}__{value_name} (({type_name}){{ .value = {num} }})"
+            )
+
+        count = len(values)
+
+        struct_def = (
+            f"struct {type_name} {{ int value; }};\n"
+            f"typedef struct {type_name} {type_name};"
+        )
+
+        count_define = f"#define {type_name}__count {count}"
+
+        return (
+            struct_def
+            + "\n"
+            + "\n".join(defines)
+            + "\n"
+            + count_define
+        )
+
+    return pattern.sub(replacer, code)
+
+def insert_typenum_compare(line_number, code):
+    macro_block = (
+        "#ifndef typenum__compare\n"
+        "#define typenum__compare(a, b) ((a).value == (b).value)\n"
+        "#endif"
+    )
+
+    lines = code.splitlines()
+    
+    # Insert after the specified line number
+    insert_index = line_number + 1
+    if insert_index > len(lines):
+        insert_index = len(lines)  # append at end if line_number is last line
+
+    # Insert the macro block as multiple lines
+    new_lines = lines[:insert_index] + [""] + macro_block.splitlines() + lines[insert_index:]
+
+    return "\n".join(new_lines)
+
+def has_typenum_keyword(code):
+    return bool(re.search(r'\btypenum\b', code))
+
+def process_typenum(code):
+    if has_typenum_keyword(code):
+        compare_macro_line = find_last_include_line(code)
+        code = insert_typenum_compare(compare_macro_line, code)
+        code = transform_typenum(code)
+    return code
+
+# -----------------------------
 # Transpile
 # -----------------------------
 def transpile_ec(code):
-    # 1. Preprocess typestructs
+
+
+    code = process_typenum(code)
     code = preprocess_typestruct(code)
-    # 2. Process prefixes
     code = preprocess_prefixes(code)
-    # 3. Process indef
     code = process_indef(code)
-    # 4. Process mut/const
     code = process_mut_const(code)
-    # 5. Process safe pointers
     code = process_safe_pointers(code)
 
     return code
