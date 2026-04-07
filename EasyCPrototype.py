@@ -383,7 +383,7 @@ def extract_c_types(code: str):
         code = re.sub(rf'\b{q}\b', '', code)
 
     # Remove mut/ref keywords
-    code = re.sub(r'\b(mut|ref)\b', '', code)
+    code = re.sub(r'\b(mut|safe)\b', '', code)
 
     # Remove preprocessor lines
     code = re.sub(r'^.*#.*$', '', code, flags=re.MULTILINE)
@@ -529,20 +529,195 @@ def add_const_to_type(code: str, type_name: str) -> str:
     return code
 
 def process_mut_const(code):
-    check_ref_mut(code)
-
     types = extract_c_types(code)
-    print(len(types), "unique C types detected:")
     for t in types:
-        print(t)
         code = add_const_to_type(code, t)
 
     return code
 
 # -----------------------------
-# Nullable Handling
+# Process safe pointers
 # -----------------------------
-def process_nullable(code):
+def add_safe_nullchecks_locals(code):
+    lines = code.splitlines()
+    output = []
+
+    pattern = re.compile(
+        r'^\s*'
+        r'(?P<prefix>safe\s+)?'            
+        r'(?P<type>[\w\s]+?)'              
+        r'\s*\*\s*'
+        r'(?P<const_after>\bconst\b\s*)?'
+        r'(?P<var>[A-Za-z_][A-Za-z0-9_]*)' 
+        r'(?:\s*=\s*[^;]+)?'               
+        r'\s*;'
+    )
+
+    for line in lines:
+        match = pattern.match(line)
+        if not match:
+            output.append(line)
+            continue
+
+        prefix = match.group('prefix') or ""
+        var_name = match.group('var')
+        const_after = match.group('const_after')
+
+        if not prefix:
+            output.append(line)
+            continue
+
+        if not const_after:
+            raise ValueError(f"Safe pointer must have const before variable: {var_name}")
+
+        output.append(line)
+        indent = re.match(r'^\s*', line).group(0)
+        output.append(f"{indent}EC__NULL__CHECK({var_name});")
+
+    return "\n".join(output)
+
+
+def add_safe_nullchecks_params(code):
+    lines = code.splitlines()
+    output = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if '(' not in line:
+            output.append(line)
+            i += 1
+            continue
+
+        # Collect all lines of function signature until '{'
+        func_lines = []
+        while i < len(lines):
+            func_lines.append(lines[i])
+            if '{' in lines[i]:
+                i += 1
+                break
+            i += 1
+
+        # Extract the parameters string
+        func_text = ' '.join(func_lines)
+        params_match = re.search(r'\((.*)\)\s*\{', func_text)
+        if not params_match:
+            output.extend(func_lines)
+            continue
+
+        params_str = params_match.group(1)
+        param_list = [p.strip() for p in params_str.split(',') if p.strip()]
+
+        # Detect all safe pointer variables
+        vars_to_check = []
+        param_pattern = re.compile(
+            r'(?P<prefix>safe\s+)?'
+            r'(?P<type>[\w\s]+?)'
+            r'\s*\*\s*'
+            r'(?P<const_after>\bconst\b\s*)?'
+            r'(?P<var>[A-Za-z_][A-Za-z0-9_]*)'
+        )
+        for p in param_list:
+            for m in param_pattern.finditer(p):
+                prefix = m.group('prefix') or ""
+                var_name = m.group('var')
+                const_after = m.group('const_after')
+                if prefix and not const_after:
+                    raise ValueError(f"Safe pointer parameter must have const: {var_name}")
+                if prefix:
+                    vars_to_check.append(var_name)
+
+        # Add original function lines
+        output.extend(func_lines)
+
+        # Add null checks at start of function body
+        first_line_indent = re.match(r'^(\s*)', func_lines[-1]).group(1) + "    "
+        for var in vars_to_check:
+            output.append(f"{first_line_indent}EC__NULL__CHECK({var});")
+
+    return "\n".join(output)
+
+def has_safe_keyword(code):
+    """
+    Returns True if the keyword 'safe' is used anywhere in the code,
+    otherwise False. Only matches 'safe' as a full word.
+    """
+    return bool(re.search(r'\bsafe\b', code))
+
+def remove_safe_keyword(code):
+    """
+    Removes all instances of the keyword 'safe' from the code,
+    preserving all spacing, indentation, and formatting.
+    Only removes 'safe' as a full word.
+    """
+    # Use word boundaries to match 'safe' as a separate word
+    cleaned_code = re.sub(r'\bsafe\b\s?', '', code)
+    return cleaned_code
+
+def find_last_include_line(code):
+    """
+    Finds the last line that starts with '#include'.
+    Returns the 0-based line number of the last include,
+    or -1 if no include lines are present.
+    """
+    last_include_index = -1
+    lines = code.splitlines()
+    
+    for i, line in enumerate(lines):
+        if line.strip().startswith("#include"):
+            last_include_index = i
+    
+    return last_include_index
+
+def insert_nullcheck_macro_after_line(line_number, code):
+    """
+    Inserts the EC__NULL__CHECK macro block immediately after the specified line number.
+    Uses a safe macro that prints the file and line correctly.
+    """
+    macro_block = (
+        "#ifndef EC__NULL__CHECK\n"
+        "#include <stdio.h>\n"
+        "#include <stdlib.h>\n"
+        "#define EC__NULL__CHECK(x) \\\n"
+        "    do { \\\n"
+        "        if ((x) == NULL) { \\\n"
+        "            printf(\"File %s - Line %d had illegal null pointer, now exiting...\\n\", __FILE__, __LINE__); \\\n"
+        "            exit(1); \\\n"
+        "        } \\\n"
+        "    } while(0)\n"
+        "#endif"
+    )
+
+    lines = code.splitlines()
+    
+    # Insert after the specified line number
+    insert_index = line_number + 1
+    if insert_index > len(lines):
+        insert_index = len(lines)  # append at end if line_number is last line
+
+    # Insert the macro block as multiple lines
+    new_lines = lines[:insert_index] + [""] + macro_block.splitlines() + lines[insert_index:]
+
+    return "\n".join(new_lines)
+
+def has_nullcheck_macro(code):
+    """
+    Returns True if the C code contains a definition of EC__NULL__CHECK macro,
+    otherwise False.
+    """
+    # \s* allows optional spaces between #define and macro name
+    pattern = re.compile(r'^\s*#define\s+EC__NULL__CHECK\b', re.MULTILINE)
+    return bool(pattern.search(code))
+
+def process_safe_pointers(code):
+    code = add_safe_nullchecks_locals(code)
+    code = add_safe_nullchecks_params(code)
+    if has_safe_keyword(code) and not has_nullcheck_macro(code):
+        code = remove_safe_keyword(code)
+        last_include_line = find_last_include_line(code)
+        code = insert_nullcheck_macro_after_line(last_include_line, code)
+
     return code
 
 # -----------------------------
@@ -557,6 +732,8 @@ def transpile_ec(code):
     code = process_indef(code)
     # 4. Process mut/const
     code = process_mut_const(code)
+    # 5. Process safe pointers
+    code = process_safe_pointers(code)
 
     return code
 
