@@ -411,18 +411,6 @@ def extract_c_types(code: str):
 
     return types
 
-def check_ref_mut(code: str):
-    """
-    Raises an error if the code contains 'ref mut'.
-    """
-    # Remove comments and strings to avoid false positives
-    code_clean = re.sub(r"//.*?$|/\*.*?\*/", "", code, flags=re.S | re.M)
-    code_clean = re.sub(r'"(\\.|[^"\\])*"|\'(\\.|[^\'\\])*\'', '', code_clean)
-
-    # Search for 'ref' followed by 'mut' as whole words
-    if re.search(r'\bref\b\s+\bmut\b', code_clean):
-        raise ValueError("Error: 'ref mut' not allowed, change to 'mut ref'.")
-
 def add_const_to_type(code: str, type_name: str) -> str:
     t = re.escape(type_name)
 
