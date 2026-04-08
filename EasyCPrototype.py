@@ -1032,20 +1032,84 @@ def remove_const_from_non_pointer_returns(code: str) -> str:
     return pattern.sub(replacer, code)
 
 # -----------------------------
+# Make indentation consistent (4 spaces)
+# -----------------------------
+def standardize_indentation(code: str, spaces_per_level: int = 4) -> str:
+    """
+    Standardizes C indentation to 4 spaces per block.
+    Ignores braces inside strings and comments.
+    Handles cases like '} else {' correctly.
+    """
+
+    def strip_strings_and_comments(s):
+        # Remove // comments
+        s = re.sub(r'//.*', '', s)
+
+        # Remove /* */ comments (single-line safe)
+        s = re.sub(r'/\*.*?\*/', '', s)
+
+        # Remove string literals
+        s = re.sub(r'"(\\.|[^"\\])*"', '', s)
+
+        # Remove char literals
+        s = re.sub(r"'(\\.|[^'\\])+'", '', s)
+
+        return s
+
+    lines = code.splitlines()
+    result = []
+    indent_level = 0
+
+    for line in lines:
+        stripped = line.strip()
+
+        if not stripped:
+            result.append('')
+            continue
+
+        # Remove strings/comments before counting braces
+        clean = strip_strings_and_comments(stripped)
+
+        # Count leading closing braces
+        leading_closes = len(re.match(r'^}+', clean).group(0)) if re.match(r'^}+', clean) else 0
+
+        # Step 1: reduce indent for leading '}'
+        indent_level = max(indent_level - leading_closes, 0)
+
+        # Step 2: write line
+        result.append(' ' * (indent_level * spaces_per_level) + stripped)
+
+        # Step 3: count remaining braces
+        open_braces = clean.count('{')
+        close_braces = clean.count('}')
+
+        # subtract the ones already handled at start
+        close_braces -= leading_closes
+
+        indent_level += open_braces - close_braces
+
+        if indent_level < 0:
+            indent_level = 0
+
+    return '\n'.join(result)
+
+# -----------------------------
 # Transpile
 # -----------------------------
 def transpile_ec(code):
 
-
+    # Process EasyC keywords
     code = process_typenum(code)
     code = process_typestruct(code)
     code = process_prefixes(code)
     code = process_indef(code)
     code = process_mut_const(code)
     code = process_safe_pointers(code)
+    # Cleanup and formatting
     code = add_generated_warning(code)
     code = normalize_includes(code)
     code = remove_const_from_non_pointer_returns(code)
+    code = standardize_indentation(code)
 
     return code
 
