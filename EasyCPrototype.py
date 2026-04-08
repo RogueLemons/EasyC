@@ -966,6 +966,72 @@ def add_generated_warning(code: str) -> str:
     return warning + code
 
 # -----------------------------
+# Convert EasyC headers and files to C in include statements
+# -----------------------------
+def normalize_includes(code: str) -> str:
+    """
+    Rewrites #include paths:
+    - .eh -> .h
+    - .ec -> .c
+    """
+
+    include_pattern = re.compile(
+        r'(#include\s*[<"])([^">]+)([>"])'
+    )
+
+    def replace(match):
+        prefix = match.group(1)
+        path = match.group(2)
+        suffix = match.group(3)
+
+        # Replace extensions
+        if path.endswith(".eh"):
+            path = path[:-3] + ".h"
+        elif path.endswith(".ec"):
+            path = path[:-3] + ".c"
+
+        return f"{prefix}{path}{suffix}"
+
+    return include_pattern.sub(replace, code)
+
+# -----------------------------
+# Clean up superflous const return types
+# -----------------------------
+def remove_const_from_non_pointer_returns(code: str) -> str:
+    """
+    Removes 'const' from function return types if the return type
+    does NOT contain a pointer (*). Supports standard C qualifiers
+    like static, inline, extern, etc.
+    """
+
+    pattern = re.compile(
+        r'(^\s*)'                                      # indentation
+        r'(?P<ret>(?:\b\w+\b[\s\*]+)*?)'                # return type + qualifiers
+        r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)'             # function name
+        r'\s*\((?P<params>[^)]*)\)'                     # parameters
+        r'(?P<ending>\s*[;{])',                        # ; or {
+        re.MULTILINE
+    )
+
+    def replacer(match):
+        indent = match.group(1)
+        ret = match.group("ret")
+        name = match.group("name")
+        params = match.group("params")
+        ending = match.group("ending")
+
+        # If NO pointer in return type → remove 'const'
+        if '*' not in ret:
+            ret = re.sub(r'\bconst\b\s*', '', ret)
+
+        # Clean up extra spaces
+        ret = re.sub(r'\s+', ' ', ret).strip()
+
+        return f"{indent}{ret} {name}({params}){ending}"
+
+    return pattern.sub(replacer, code)
+
+# -----------------------------
 # Transpile
 # -----------------------------
 def transpile_ec(code):
@@ -978,6 +1044,8 @@ def transpile_ec(code):
     code = process_mut_const(code)
     code = process_safe_pointers(code)
     code = add_generated_warning(code)
+    code = normalize_includes(code)
+    code = remove_const_from_non_pointer_returns(code)
 
     return code
 
