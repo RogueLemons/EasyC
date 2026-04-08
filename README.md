@@ -17,11 +17,9 @@ It started with the idea "What if C variables were const by default?". Since the
 # TODO
 - keyword **cleanpop**: variable initialized with cleanpop automatically calls POPULATE__type(t) on next line and before scope exits (and before return statements) calls CLEANUP__type(t), must be defined as functions or macros manually
 - invert keyword **safe** so everything is safe by default and make user use keyword **nullable** for pointers that may be null
-- convert .eh and .ec file includes to .h and .c
 - keyword **typenum**: add ability to assign internal type e.g. typenum(char) Status { OK = 0, Error = 1 };
 
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include
 - cannot use * without whitespace after unless dereferencing (* some_ptr not ok) or multiplying (a * b not ok)
 - cannot typedef and define struct in same statement
-- unnecessary const in non-pointer return types
