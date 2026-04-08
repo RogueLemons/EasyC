@@ -526,6 +526,148 @@ def process_mut_const(code):
 # -----------------------------
 # Process safe pointers
 # -----------------------------
+def validate_safe_functions(code):
+    """
+    Validates safe functions in C code.
+
+    Rules enforced:
+    1. Safe consistency between declaration and definition.
+    2. Safe functions must return pointer types.
+    3. All return statements in safe functions must be 'return <identifier>;'
+       with only letters, numbers, underscore.
+    4. Returned variable must be declared safe (argument or local variable).
+    """
+
+    # -------------------------
+    # Patterns
+    # -------------------------
+    definition_pattern = re.compile(
+        r'^\s*'
+        r'(?P<safe>safe\s+)?'
+        r'(?P<ret>[A-Za-z_][\w\s\*\d]*?)\s+'
+        r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)'
+        r'\s*\((?P<params>[^)]*)\)\s*'
+        r'\{(?P<body>.*?)\}',
+        re.MULTILINE | re.DOTALL
+    )
+
+    declaration_pattern = re.compile(
+        r'^\s*'
+        r'(?P<safe>safe\s+)?'
+        r'(?P<ret>[A-Za-z_][\w\s\*\d]*?)\s+'
+        r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)'
+        r'\s*\((?P<params>[^)]*)\)\s*;',
+        re.MULTILINE
+    )
+
+    return_pattern = re.compile(r'\breturn\s+([A-Za-z_][A-Za-z0-9_]*)\s*;')
+
+    # -------------------------
+    # Robust variable declaration pattern
+    # -------------------------
+    var_decl_pattern = re.compile(
+        r'^(?P<prefix>(?:\b\w+\b\s+)*)'  # all keywords before variable name
+        r'(?:[A-Za-z_][A-Za-z0-9_\s\*]*)\s+'  # type portion (int*, mut int*, etc.)
+        r'(?P<var>[A-Za-z_][A-Za-z0-9_]*)'     # variable name
+        r'\s*(?:=.*)?;',                        # optional initialization
+        re.MULTILINE
+    )
+
+    declarations = {}
+    definitions = {}
+
+    # -------------------------
+    # Parse declarations
+    # -------------------------
+    for match in declaration_pattern.finditer(code):
+        name = match.group("name")
+        is_safe = bool(match.group("safe"))
+        ret_type = match.group("ret").strip()
+
+        if is_safe and '*' not in ret_type:
+            raise ValueError(
+                f"Function '{name}' is marked safe but return type is not a pointer: '{ret_type}'"
+            )
+
+        declarations[name] = {"safe": is_safe, "return_type": ret_type}
+
+    # -------------------------
+    # Parse definitions
+    # -------------------------
+    for match in definition_pattern.finditer(code):
+        name = match.group("name")
+        is_safe = bool(match.group("safe"))
+        ret_type = match.group("ret").strip()
+        body = match.group("body")
+
+        if is_safe and '*' not in ret_type:
+            raise ValueError(
+                f"Function '{name}' is marked safe but return type is not a pointer: '{ret_type}'"
+            )
+
+        # -------------------------
+        # Parse arguments
+        # -------------------------
+        safe_args = set()
+        args = [p.strip() for p in match.group("params").split(",") if p.strip()]
+        for arg in args:
+            tokens = re.findall(r'[A-Za-z_][A-Za-z0-9_]*', arg)
+            if not tokens:
+                continue
+            var_name = tokens[-1]
+            if arg.startswith("safe"):
+                safe_args.add(var_name)
+
+        # -------------------------
+        # Collect all safe local variables
+        # -------------------------
+        body_lines = body.splitlines()
+        safe_locals = set()
+        for line in body_lines:
+            line = line.strip()
+            decl_match = var_decl_pattern.match(line)
+            if decl_match:
+                var_name = decl_match.group("var")
+                prefix_keywords = decl_match.group("prefix").split()
+                if "safe" in prefix_keywords:
+                    safe_locals.add(var_name)
+
+        # -------------------------
+        # Validate return statements
+        # -------------------------
+        for ret_match in return_pattern.finditer(body):
+            ret_var = ret_match.group(1)
+
+            # Must be a single identifier (letters/numbers/underscore)
+            if not re.fullmatch(r'[A-Za-z0-9_]+', ret_var):
+                raise ValueError(
+                    f"Function '{name}' return '{ret_var}' is invalid, must be a single identifier"
+                )
+
+            # Must be declared safe (argument or local variable)
+            if ret_var not in safe_locals and ret_var not in safe_args:
+                raise ValueError(
+                    f"Function '{name}' returns '{ret_var}' which is not safe "
+                    f"(not a safe argument or safe local)"
+                )
+
+        definitions[name] = {"safe": is_safe, "return_type": ret_type}
+
+    # -------------------------
+    # Safe consistency check
+    # -------------------------
+    for name, decl in declarations.items():
+        if name in definitions:
+            defn = definitions[name]
+            if decl["safe"] != defn["safe"]:
+                raise ValueError(
+                    f"Function '{name}' mismatch: declaration has "
+                    f"{'safe' if decl['safe'] else 'no safe'}, "
+                    f"but definition has {'safe' if defn['safe'] else 'no safe'}"
+                )
+
+    return {"declarations": declarations, "definitions": definitions}
+
 def add_safe_nullchecks_locals(code):
     lines = code.splitlines()
     output = []
@@ -699,6 +841,7 @@ def has_nullcheck_macro(code):
     return bool(pattern.search(code))
 
 def process_safe_pointers(code):
+    validate_safe_functions(code)
     code = add_safe_nullchecks_locals(code)
     code = add_safe_nullchecks_params(code)
     if has_safe_keyword(code) and not has_nullcheck_macro(code):
@@ -770,17 +913,21 @@ def transform_typenum(code):
             seen_values[num] = value_name
 
             defines.append(
-                f"#define {type_name}__{value_name} (({type_name}){{ .value = {num} }})"
+                f"#define {type_name}__{value_name} (({type_name}){{ .{type_name}_value = {num} }})"
             )
 
         count = len(values)
 
         struct_def = (
-            f"struct {type_name} {{ int value; }};\n"
+            f"struct {type_name} {{ int {type_name}_value; }};\n"
             f"typedef struct {type_name} {type_name};"
         )
 
         count_define = f"#define {type_name}__count {count}"
+
+        type_equals = f"#define {type_name}__equals(a, b) ((a).{type_name}_value == (b).{type_name}_value)"
+
+        type_get_value = f"#define {type_name}__get(a) ((a).{type_name}_value)"
 
         return (
             struct_def
@@ -788,36 +935,19 @@ def transform_typenum(code):
             + "\n".join(defines)
             + "\n"
             + count_define
+            + "\n"
+            + type_equals
+            + "\n"
+            + type_get_value
         )
 
     return pattern.sub(replacer, code)
-
-def insert_typenum_compare(line_number, code):
-    macro_block = (
-        "#ifndef typenum__compare\n"
-        "#define typenum__compare(a, b) ((a).value == (b).value)\n"
-        "#endif"
-    )
-
-    lines = code.splitlines()
-    
-    # Insert after the specified line number
-    insert_index = line_number + 1
-    if insert_index > len(lines):
-        insert_index = len(lines)  # append at end if line_number is last line
-
-    # Insert the macro block as multiple lines
-    new_lines = lines[:insert_index] + [""] + macro_block.splitlines() + lines[insert_index:]
-
-    return "\n".join(new_lines)
 
 def has_typenum_keyword(code):
     return bool(re.search(r'\btypenum\b', code))
 
 def process_typenum(code):
     if has_typenum_keyword(code):
-        compare_macro_line = find_last_include_line(code)
-        code = insert_typenum_compare(compare_macro_line, code)
         code = transform_typenum(code)
     return code
 
