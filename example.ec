@@ -198,3 +198,14 @@ void bar()
     printf("Greeting 2: %s\n", greeting_2->data);
 
 }
+
+// ========= cleanpop macros and standard types =========
+
+#define int::populate(i) (*i) = 0
+#define int::cleanup(i) 
+
+void baz()
+{
+    cleanpop int i;
+    // Do stuff
+}

@@ -231,3 +231,35 @@ void bar()
     String__cleanup((String*)&greeting_2);
     String__cleanup(&greeting_1);
 }
+
+// ========= cleanpop macros and standard types =========
+
+#define int__populate(i) (*i) = 0
+#define int__cleanup(i)
+
+void baz()
+{
+    const int i;
+    int__populate((int*)&i);
+    // Do stuff
+    int__cleanup((int*)&i);
+}
+
+typedef c_string char*;
+void c_string__populate(mut c_string* const str)
+{
+    (*str) = NULL;
+}
+void c_string__cleanup(mut c_string* const str)
+{
+    free((*str));
+    (*str) = NULL;
+}
+
+void qux()
+{
+    mut c_string;
+    mut__populate(&c_string);
+    // Do stuff
+    mut__cleanup(&c_string);
+}
