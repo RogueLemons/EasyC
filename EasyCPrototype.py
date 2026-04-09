@@ -299,23 +299,35 @@ def process_indef(code):
     def make_define(name, type_text, expr, prefix=None):
         if prefix:
             name = f"{prefix}__{name}"
-        return f"#define {name} (({type_text})({expr}))"
+
+        stripped_expr = expr.strip()
+        if stripped_expr.startswith("{") and stripped_expr.endswith("}"):
+            return f"#define {name} (({type_text}){stripped_expr})"
+        else:
+            return f"#define {name} (({type_text})({expr}))"
 
     for line in lines:
         stripped = line.strip()
 
-        # Outside any function
+        # --- Outside any function ---
         if current_function is None and pending_function is None:
-            # Check for indef
+            # Check for top-level indef
             indef_match = indef_pattern.match(line)
             if indef_match:
-                declaration = indef_match.group(0)
                 type_text = indef_match.group(1).strip()
                 name = indef_match.group(2)
                 expr = indef_match.group(3).strip()
-                if re.search(r'\b(static|mut|safe)\b', declaration):
-                    raise ValueError("indef declaration cannot contain static, mut, or safe")
-                output_lines.append(make_define(name, type_text, expr))
+
+                # Replace references to previous top-level indefs
+                for orig_name, pref_name in replace_map.items():
+                    expr = re.sub(rf'\b{orig_name}\b', pref_name, expr)
+
+                # Add #define immediately
+                define_line = make_define(name, type_text, expr)
+                output_lines.append(define_line)
+
+                # Add to replacement map
+                replace_map[name] = name
                 continue
 
             # Check for function start
@@ -335,7 +347,7 @@ def process_indef(code):
             output_lines.append(line)
             continue
 
-        # Handle pending function waiting for opening brace
+        # --- Pending function waiting for opening brace ---
         if current_function is None and pending_function is not None:
             if stripped == '{':
                 current_function = pending_function
@@ -348,28 +360,30 @@ def process_indef(code):
             output_lines.append(line)
             continue
 
-        # Inside a function
+        # --- Inside a function ---
         if current_function is not None:
-            # Check for indef declarations
             indef_match = indef_pattern.match(line)
             if indef_match:
-                declaration = indef_match.group(0)
                 type_text = indef_match.group(1).strip()
                 name = indef_match.group(2)
                 expr = indef_match.group(3).strip()
-                if re.search(r'\b(static|mut|safe)\b', declaration):
-                    raise ValueError("indef declaration cannot contain static, mut, or safe")
 
-                # Add #define
-                pending_inserts[current_function].append(
-                    make_define(name, type_text, expr, prefix=current_function)
-                )
+                # Replace references to previous indefs
+                for orig_name, pref_name in replace_map.items():
+                    expr = re.sub(rf'\b{orig_name}\b', pref_name, expr)
 
-                # Store mapping for replacements
-                replace_map[name] = f"{current_function}__{name}"
+                # Make prefixed define
+                prefixed_name = f"{current_function}__{name}"
+                define_line = make_define(name, type_text, expr, prefix=current_function)
+
+                # Store define to insert at top of function later
+                pending_inserts[current_function].append(define_line)
+
+                # Update replacement map immediately for later indefs
+                replace_map[name] = prefixed_name
                 continue
 
-            # Replace indef uses in the line
+            # Replace uses of indef variables in the line
             for orig_name, pref_name in replace_map.items():
                 line = re.sub(rf'\b{orig_name}\b', pref_name, line)
 
@@ -377,7 +391,7 @@ def process_indef(code):
             brace_depth += line.count('{') - line.count('}')
             output_lines.append(line)
 
-            # Insert #defines at function start
+            # Insert pending #defines at top of function
             if brace_depth == 0:
                 inserts = pending_inserts.get(current_function, [])
                 if inserts:
