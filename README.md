@@ -367,13 +367,6 @@ void String::cleanup(safe mut String* str)
     str->capacity = 0;
 }
 void String::set(safe mut String* target, safe char* c_string);
-
-void foo()
-{
-    cleanpop mut String str;
-    String::set(&str, "Hello there!");
-    printf("The greeting: %s\n", str->data);
-}
 ```
 ### Transpiled C
 ```c
@@ -400,7 +393,19 @@ void String__cleanup(String* const str)
     str->capacity = 0;
 }
 void String__set(String* const target, const char* const c_string);
+```
 
+### EasyC
+```c
+void foo()
+{
+    cleanpop mut String str;
+    String::set(&str, "Hello there!");
+    printf("The greeting: %s\n", str->data);
+}
+```
+### Transpiled C
+```c
 void foo()
 {
     String str;
@@ -410,6 +415,7 @@ void foo()
     String__cleanup(&str);
 }
 ```
+
 ### EasyC
 ```c
 void String::add(safe mut String* target, safe char* addition);
