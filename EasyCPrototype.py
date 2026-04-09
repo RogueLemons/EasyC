@@ -635,21 +635,22 @@ def validate_safe_functions(code):
         # -------------------------
         # Validate return statements
         # -------------------------
-        for ret_match in return_pattern.finditer(body):
-            ret_var = ret_match.group(1)
+        if is_safe:
+            for ret_match in return_pattern.finditer(body):
+                ret_var = ret_match.group(1)
 
-            # Must be a single identifier (letters/numbers/underscore)
-            if not re.fullmatch(r'[A-Za-z0-9_]+', ret_var):
-                raise ValueError(
-                    f"Function '{name}' return '{ret_var}' is invalid, must be a single identifier"
-                )
+                # Must be a single identifier
+                if not re.fullmatch(r'[A-Za-z0-9_]+', ret_var):
+                    raise ValueError(
+                        f"Function '{name}' return '{ret_var}' is invalid, must be a single identifier"
+                    )
 
-            # Must be declared safe (argument or local variable)
-            if ret_var not in safe_locals and ret_var not in safe_args:
-                raise ValueError(
-                    f"Function '{name}' returns '{ret_var}' which is not safe "
-                    f"(not a safe argument or safe local)"
-                )
+                # Must be declared safe
+                if ret_var not in safe_locals and ret_var not in safe_args:
+                    raise ValueError(
+                        f"Function '{name}' returns '{ret_var}' which is not safe "
+                        f"(not a safe argument or safe local)"
+                    )
 
         definitions[name] = {"safe": is_safe, "return_type": ret_type}
 
@@ -924,9 +925,7 @@ def transform_typenum(code):
         )
 
         count_define = f"#define {type_name}__count {count}"
-
         type_equals = f"#define {type_name}__equals(a, b) ((a).{type_name}_value == (b).{type_name}_value)"
-
         type_get_value = f"#define {type_name}__get(a) ((a).{type_name}_value)"
 
         return (
