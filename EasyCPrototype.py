@@ -277,36 +277,48 @@ indef_pattern = re.compile(
 )
 
 def process_indef(code):
+    # Regex patterns
+    indef_pattern = re.compile(
+        r'^\s*indef\s+([\w\*\s]+)\s+([A-Za-z_]\w*)\s*=\s*(.+?);$'
+    )
+
     function_start_pattern = re.compile(
         r'^\s*[\w\*\s]+?\s+([A-Za-z_]\w*)\s*\([^;{]*\)\s*(\{)?\s*$'
     )
+
     lines = code.splitlines()
     output_lines = []
+
     current_function = None
     current_function_start = None
     pending_function = None
     brace_depth = 0
     pending_inserts = {}
+    replace_map = {}
 
     def make_define(name, type_text, expr, prefix=None):
         if prefix:
             name = f"{prefix}__{name}"
-        return f"#define {name} ({type_text})({expr})"
+        return f"#define {name} (({type_text})({expr}))"
 
     for line in lines:
         stripped = line.strip()
+
+        # Outside any function
         if current_function is None and pending_function is None:
+            # Check for indef
             indef_match = indef_pattern.match(line)
             if indef_match:
                 declaration = indef_match.group(0)
                 type_text = indef_match.group(1).strip()
                 name = indef_match.group(2)
                 expr = indef_match.group(3).strip()
-                if re.search(r'\b(static|mut|ref)\b', declaration):
-                    raise ValueError("indef declaration cannot contain static, mut, or ref")
+                if re.search(r'\b(static|mut|safe)\b', declaration):
+                    raise ValueError("indef declaration cannot contain static, mut, or safe")
                 output_lines.append(make_define(name, type_text, expr))
                 continue
 
+            # Check for function start
             func_match = function_start_pattern.match(line)
             if func_match:
                 pending_function = func_match.group(1)
@@ -317,44 +329,55 @@ def process_indef(code):
                     pending_function = None
                     brace_depth = 1
                     pending_inserts[current_function] = []
+                    replace_map = {}
                 continue
 
             output_lines.append(line)
             continue
 
+        # Handle pending function waiting for opening brace
         if current_function is None and pending_function is not None:
             if stripped == '{':
                 current_function = pending_function
                 pending_function = None
                 brace_depth = 1
                 pending_inserts[current_function] = []
-                output_lines.append(line)
-                continue
-            func_match = function_start_pattern.match(line)
-            if func_match:
+                replace_map = {}
                 output_lines.append(line)
                 continue
             output_lines.append(line)
             continue
 
+        # Inside a function
         if current_function is not None:
+            # Check for indef declarations
             indef_match = indef_pattern.match(line)
             if indef_match:
                 declaration = indef_match.group(0)
                 type_text = indef_match.group(1).strip()
                 name = indef_match.group(2)
                 expr = indef_match.group(3).strip()
-                if re.search(r'\b(static|mut|ref)\b', declaration):
-                    raise ValueError("indef declaration cannot contain static, mut, or ref")
+                if re.search(r'\b(static|mut|safe)\b', declaration):
+                    raise ValueError("indef declaration cannot contain static, mut, or safe")
+
+                # Add #define
                 pending_inserts[current_function].append(
                     make_define(name, type_text, expr, prefix=current_function)
                 )
+
+                # Store mapping for replacements
+                replace_map[name] = f"{current_function}__{name}"
                 continue
 
-            open_count = line.count('{')
-            close_count = line.count('}')
-            brace_depth += open_count - close_count
+            # Replace indef uses in the line
+            for orig_name, pref_name in replace_map.items():
+                line = re.sub(rf'\b{orig_name}\b', pref_name, line)
+
+            # Track braces to detect function end
+            brace_depth += line.count('{') - line.count('}')
             output_lines.append(line)
+
+            # Insert #defines at function start
             if brace_depth == 0:
                 inserts = pending_inserts.get(current_function, [])
                 if inserts:
@@ -362,6 +385,7 @@ def process_indef(code):
                 current_function = None
                 current_function_start = None
                 brace_depth = 0
+                replace_map = {}
             continue
 
         output_lines.append(line)
