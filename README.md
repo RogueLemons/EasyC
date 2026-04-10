@@ -614,7 +614,9 @@ void foofoo()
 
 
 # TODO
+- rename keyword **safe** (perhaps **check**?)
 - invert keyword **safe** so everything is safe by default and make user use keyword **nullable** for pointers that may be null
+- consider disallowing variables (and arguments) to be assigned with **cleanpop** variables, only allowing assignment with a new move operator (not to arguments) which moves the cleanup logic to the new variable (which might require it clean itself up), otherwise only pointers allowed
 
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include
