@@ -170,7 +170,7 @@ typedef struct GraphicMode GraphicMode;
 #define GraphicMode__equals(a, b) ((a).GraphicMode_value == (b).GraphicMode_value)
 #define GraphicMode__get(a) ((a).GraphicMode_value)
 
-// ========= typenum based on strings =========
+// ========= typenum based on c-strings =========
 
 struct ErrorType { char* ErrorType_value; };
 typedef struct ErrorType ErrorType;
@@ -220,7 +220,7 @@ void foo()
     String str;
     String__populate(&str);
     String__set(&str, "Hello there!");
-    printf("The greeting: %s\n", str->data);
+    printf("The greeting: %s\n", str.data);
     String__cleanup(&str);
 }
 
@@ -237,14 +237,14 @@ void bar()
         String doppelganger;
         String__populate(&doppelganger);
         String__set(&doppelganger, "Wow, they are doppelgangers!");
-        printf("%s\n", doppelganger->data);
+        printf("%s\n", doppelganger.data);
         String__cleanup(&doppelganger);
         String__cleanup((String*)&greeting_2);
         String__cleanup(&greeting_1);
         return;
     }
 
-    if (greeting_1->data == NULL || greeting_1->data == NULL)
+    if (greeting_1.data == NULL || greeting_1.data == NULL)
     {
         printf("Something went wrong");
         String__cleanup((String*)&greeting_2);
@@ -252,8 +252,8 @@ void bar()
         return;
     }
 
-    printf("Greeting 1: %s\n", greeting_1->data);
-    printf("Greeting 2: %s\n", greeting_2->data);
+    printf("Greeting 1: %s\n", greeting_1.data);
+    printf("Greeting 2: %s\n", greeting_2.data);
 
     String__cleanup((String*)&greeting_2);
     String__cleanup(&greeting_1);
@@ -273,7 +273,7 @@ void baz()
 {
     String str;
     String__populate_with_1(&str, "Initial string!");
-    printf("Data: %s\n", str->data);
+    printf("Data: %s\n", str.data);
     String__cleanup(&str);
 }
 
@@ -284,7 +284,7 @@ void foofoo()
 {
     const String str;
     String__populate_with_2((String*)&str, 'A', some_number());
-    if (str->size > 5) {
+    if (str.size > 5) {
         String__cleanup((String*)&str);
         return;
     }

@@ -194,7 +194,7 @@ void foo()
 {
     cleanpop mut String str;
     String::set(&str, "Hello there!");
-    printf("The greeting: %s\n", str->data);
+    printf("The greeting: %s\n", str.data);
 }
 
 void bar()
@@ -207,18 +207,18 @@ void bar()
     {
         cleanpop mut String doppelganger;
         String::set(&doppelganger, "Wow, they are doppelgangers!");
-        printf("%s\n", doppelganger->data);
+        printf("%s\n", doppelganger.data);
         return;
     }
 
-    if (greeting_1->data == NULL || greeting_1->data == NULL)
+    if (greeting_1.data == NULL || greeting_1.data == NULL)
     {
         printf("Something went wrong");
         return;
     }
 
-    printf("Greeting 1: %s\n", greeting_1->data);
-    printf("Greeting 2: %s\n", greeting_2->data);
+    printf("Greeting 1: %s\n", greeting_1.data);
+    printf("Greeting 2: %s\n", greeting_2.data);
 
 }
 
@@ -233,7 +233,7 @@ void String::populate_with_1(safe mut String* str, safe char* c_string)
 void baz()
 {
     cleanpop("Initial string!") mut String str;
-    printf("Data: %s\n", str->data);
+    printf("Data: %s\n", str.data);
 }
 
 void String::populate_with_2(safe mut String* str, char c, int repeat_char_count);
@@ -242,7 +242,7 @@ int some_number();
 void foofoo()
 {
     cleanpop('A', some_number()) String str;
-    if (str->size > 5)
+    if (str.size > 5)
         return;
     
     // do stuff
