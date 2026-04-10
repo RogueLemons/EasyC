@@ -142,6 +142,29 @@ void Log(char* log, LogOption logopt)
     }
 }
 
+// ========= typenum with own internal type =========
+
+typenum(char) GraphicMode
+{
+    performance = 'p',
+    quality = 'q'
+};
+
+// ========= typenum based on c-strings =========
+
+typenum(char*) ErrorType
+{
+    mechanical = "Mechanical failure",
+    electrical = "Electrical failure",
+    programatic = "Software failure"
+};
+
+void PrintErrorMessage(ErrorType err)
+{
+    char* err_msg = ErrorType::get(err);
+    printf(err_msg);
+}
+
 // ========= cleanpop =========
 
 typestruct String

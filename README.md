@@ -343,6 +343,56 @@ void Log(const char* const log, const LogOption logopt)
     }
 }
 ```
+### EasyC
+```c
+typenum(char) GraphicMode
+{
+    performance = 'p',
+    quality = 'q'
+};
+```
+### Transpiled C
+```c
+struct GraphicMode { char GraphicMode_value; };
+typedef struct GraphicMode GraphicMode;
+#define GraphicMode__performance ((const GraphicMode){ .GraphicMode_value = 'p' })
+#define GraphicMode__quality ((const GraphicMode){ .GraphicMode_value = 'q' })
+#define GraphicMode__count 2
+#define GraphicMode__equals(a, b) ((a).GraphicMode_value == (b).GraphicMode_value)
+#define GraphicMode__get(a) ((a).GraphicMode_value)
+```
+### EasyC
+```c
+typenum(char*) ErrorType
+{
+    mechanical = "Mechanical failure",
+    electrical = "Electrical failure",
+    programatic = "Software failure"
+};
+
+void PrintErrorMessage(ErrorType err)
+{
+    char* err_msg = ErrorType::get(err);
+    printf(err_msg);
+}
+```
+### Transpiled C
+```c
+struct ErrorType { char* ErrorType_value; };
+typedef struct ErrorType ErrorType;
+#define ErrorType__mechanical ((const ErrorType){ .ErrorType_value = "Mechanical failure" })
+#define ErrorType__electrical ((const ErrorType){ .ErrorType_value = "Electrical failure" })
+#define ErrorType__programatic ((const ErrorType){ .ErrorType_value = "Software failure" })
+#define ErrorType__count 3
+#define ErrorType__equals(a, b) ((a).ErrorType_value == (b).ErrorType_value)
+#define ErrorType__get(a) ((a).ErrorType_value)
+
+void PrintErrorMessage(const ErrorType err)
+{
+    const char* const err_msg = ErrorType__get(err);
+    printf(err_msg);
+}
+```
 
 ## Automatic memory management with keyword cleanpop
 ### EasyC
@@ -550,7 +600,6 @@ void foofoo()
 
 # TODO
 - invert keyword **safe** so everything is safe by default and make user use keyword **nullable** for pointers that may be null
-- keyword **typenum**: add ability to assign internal type e.g. typenum(char) Status { OK = 0, Error = 1 };
 
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include

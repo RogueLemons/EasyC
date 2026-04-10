@@ -948,21 +948,40 @@ def transform_typenum(code):
     - #defines for each value
     - #define TypeName__count N
 
+    Supports:
+    - typenum Name { ... }              -> defaults to int
+    - typenum(type) Name { ... }       -> uses custom type
+
     Raises ValueError if:
     - any entry lacks '='
     - duplicate numeric values are found
     - duplicate names are found
     - no values exist
+    - empty type in typenum()
     """
 
     pattern = re.compile(
-        r'typenum\s+([A-Za-z_][A-Za-z0-9_]*)\s*{(.*?)}\s*;',
+        r'typenum(?:\((.*?)\))?\s+([A-Za-z_][A-Za-z0-9_]*)\s*{(.*?)}\s*;',
         re.DOTALL
     )
 
     def replacer(match):
-        type_name = match.group(1)
-        body = match.group(2).strip()
+        raw_type = match.group(1)   # optional (inside parentheses)
+        type_name = match.group(2)
+        body = match.group(3).strip()
+
+        # -------------------------
+        # Resolve underlying type
+        # -------------------------
+        if raw_type is None:
+            base_type = "int"
+        else:
+            base_type = raw_type.strip()
+
+            if not base_type:
+                raise ValueError(
+                    f"Typenum '{type_name}' has empty base type"
+                )
 
         values = [v.strip() for v in body.split(',') if v.strip()]
 
@@ -1006,7 +1025,7 @@ def transform_typenum(code):
         count = len(values)
 
         struct_def = (
-            f"struct {type_name} {{ int {type_name}_value; }};\n"
+            f"struct {type_name} {{ {base_type} {type_name}_value; }};\n"
             f"typedef struct {type_name} {type_name};"
         )
 

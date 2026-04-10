@@ -160,6 +160,33 @@ void Log(const char* const log, const LogOption logopt)
     }
 }
 
+// ========= typenum with own internal type =========
+
+struct GraphicMode { char GraphicMode_value; };
+typedef struct GraphicMode GraphicMode;
+#define GraphicMode__performance ((const GraphicMode){ .GraphicMode_value = 'p' })
+#define GraphicMode__quality ((const GraphicMode){ .GraphicMode_value = 'q' })
+#define GraphicMode__count 2
+#define GraphicMode__equals(a, b) ((a).GraphicMode_value == (b).GraphicMode_value)
+#define GraphicMode__get(a) ((a).GraphicMode_value)
+
+// ========= typenum based on strings =========
+
+struct ErrorType { char* ErrorType_value; };
+typedef struct ErrorType ErrorType;
+#define ErrorType__mechanical ((const ErrorType){ .ErrorType_value = "Mechanical failure" })
+#define ErrorType__electrical ((const ErrorType){ .ErrorType_value = "Electrical failure" })
+#define ErrorType__programatic ((const ErrorType){ .ErrorType_value = "Software failure" })
+#define ErrorType__count 3
+#define ErrorType__equals(a, b) ((a).ErrorType_value == (b).ErrorType_value)
+#define ErrorType__get(a) ((a).ErrorType_value)
+
+void PrintErrorMessage(const ErrorType err)
+{
+    const char* const err_msg = ErrorType__get(err);
+    printf(err_msg);
+}
+
 // ========= cleanpop =========
 
 struct String
