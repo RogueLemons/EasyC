@@ -612,7 +612,7 @@ void foofoo()
 
 
 # TODO
-- invert keyword **check** so everything is check by default and make user use keyword **nullable** for pointers that may be null
+- consider inverting keyword **check** so everything is check by default and make user use keyword **nullable** for pointers that may be null
 - consider disallowing variables (and arguments) to be assigned with **cleanpop** variables, only allowing assignment with a new move operator (not to arguments) which moves the cleanup logic to the new variable (which might require it clean itself up), otherwise only pointers allowed
 - IMPORTANT: fix **cleanpop** const variables, may not cast away the const
 
