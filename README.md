@@ -488,7 +488,7 @@ void bar()
 {
     cleanpop mut String greeting_1;
     String::set(&greeting_1, "Hello there!");
-    cleanpop String greeting_2;
+    cleanpop mut String greeting_2;
 
     if (String::equals(&greeting_1, &greeting_2))
     {
@@ -519,8 +519,8 @@ void bar()
     String greeting_1;
     String__populate(&greeting_1);
     String__set(&greeting_1, "Hello there!");
-    const String greeting_2;
-    String__populate((String*)&greeting_2);
+    String greeting_2;
+    String__populate(&greeting_2);
 
     if (String__equals(&greeting_1, &greeting_2))
     {
@@ -529,7 +529,7 @@ void bar()
         String__set(&doppelganger, "Wow, they are doppelgangers!");
         printf("%s\n", doppelganger.data);
         String__cleanup(&doppelganger);
-        String__cleanup((String*)&greeting_2);
+        String__cleanup(&greeting_2);
         String__cleanup(&greeting_1);
         return;
     }
@@ -537,7 +537,7 @@ void bar()
     if (greeting_1.data == NULL || greeting_2.data == NULL)
     {
         printf("Something went wrong");
-        String__cleanup((String*)&greeting_2);
+        String__cleanup(&greeting_2);
         String__cleanup(&greeting_1);
         return;
     }
@@ -545,7 +545,7 @@ void bar()
     printf("Greeting 1: %s\n", greeting_1.data);
     printf("Greeting 2: %s\n", greeting_2.data);
 
-    String__cleanup((String*)&greeting_2);
+    String__cleanup(&greeting_2);
     String__cleanup(&greeting_1);
 }
 ```
@@ -568,7 +568,7 @@ int some_number();
 
 void foofoo()
 {
-    cleanpop('A', some_number()) String str;
+    cleanpop('A', some_number()) mut String str;
     if (str.size > 5)
         return;
     
@@ -598,15 +598,15 @@ int some_number();
 
 void foofoo()
 {
-    const String str;
-    String__populate_with_2((String*)&str, 'A', some_number());
+    String str;
+    String__populate_with_2(&str, 'A', some_number());
     if (str.size > 5) {
-        String__cleanup((String*)&str);
+        String__cleanup(&str);
         return;
     }
 
     // do stuff
-    String__cleanup((String*)&str);
+    String__cleanup(&str);
 }
 ```
 

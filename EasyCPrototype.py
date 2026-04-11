@@ -1073,9 +1073,7 @@ def handle_cleanpop(code: str) -> str:
         comment_match = re.search(r'//.*|/\*.*?\*/', line)
         comment = ""
         if comment_match:
-            # Ensure a space before the comment
             comment = " " + comment_match.group(0)
-            # Remove comment temporarily
             code_line = line[:comment_match.start()]
         else:
             code_line = line
@@ -1100,6 +1098,12 @@ def handle_cleanpop(code: str) -> str:
                 raise ValueError(f"Invalid cleanpop (pointer not allowed): {line}")
             if '=' in body:
                 raise ValueError(f"Invalid cleanpop (assignment not allowed): {line}")
+
+            # -------------------------
+            # HARD RULE: const not allowed
+            # -------------------------
+            if re.search(r'\bconst\b', body):
+                raise ValueError(f"Invalid cleanpop (const not allowed): {line}")
 
             # -------------------------
             # Parse arguments safely
@@ -1128,21 +1132,20 @@ def handle_cleanpop(code: str) -> str:
             # -------------------------
             # Parse declaration
             # -------------------------
-            is_const = bool(re.search(r'\bconst\b', body))
             parts = body.split()
             if len(parts) < 2:
                 raise ValueError(f"Invalid cleanpop: {line}")
 
             var_name = parts[-1]
             type_tokens = parts[:-1]
-            type_no_const_tokens = [t for t in type_tokens if t != "const"]
-            type_name_no_const = " ".join(type_no_const_tokens)
-            type_name_full = " ".join(type_tokens)
+
+            type_name_no_const = " ".join(type_tokens)
+            type_name_full = type_name_no_const
 
             active_vars.append({
                 "name": var_name,
                 "type": type_name_no_const,
-                "is_const": is_const,
+                "is_const": False,
                 "scope": scope_level,
                 "indent": indent
             })
@@ -1154,18 +1157,10 @@ def handle_cleanpop(code: str) -> str:
             # Populate call
             # -------------------------
             if args_str is None:
-                # Original behavior (no parentheses at all)
-                if is_const:
-                    result.append(f"{indent}{type_name_no_const}__populate(({type_name_no_const}*)&{var_name});")
-                else:
-                    result.append(f"{indent}{type_name_no_const}__populate(&{var_name});")
+                result.append(f"{indent}{type_name_no_const}__populate(&{var_name});")
             else:
-                # With parentheses → use _with_n
                 args_joined = ", ".join(args)
-                if is_const:
-                    cast = f"({type_name_no_const}*)&{var_name}"
-                else:
-                    cast = f"&{var_name}"
+                cast = f"&{var_name}"
 
                 if arg_count == 0:
                     result.append(f"{indent}{type_name_no_const}__populate_with_0({cast});")
@@ -1193,16 +1188,13 @@ def handle_cleanpop(code: str) -> str:
             # Insert cleanup statements before return
             for var in reversed(active_vars):
                 if var["scope"] <= scope_level:
-                    if var["is_const"]:
-                        cleanup = f"{indent}{var['type']}__cleanup(({var['type']}*)&{var['name']});"
-                    else:
-                        cleanup = f"{indent}{var['type']}__cleanup(&{var['name']});"
+                    cleanup = f"{indent}{var['type']}__cleanup(&{var['name']});"
                     result.append(cleanup)
 
             scope_statements[scope_level].append("return")
 
         # -------------------------
-        # Normal line (add back comment with space)
+        # Normal line (add back comment)
         # -------------------------
         if stripped:
             result.append(code_line.rstrip() + comment)
@@ -1223,16 +1215,13 @@ def handle_cleanpop(code: str) -> str:
                 new_active = []
                 for var in reversed(active_vars):
                     if var["scope"] == scope_level:
-                        if skip_cleanup:
-                            continue
-                        indent = var["indent"]
-                        if var["is_const"]:
-                            cleanup = f"{indent}{var['type']}__cleanup(({var['type']}*)&{var['name']});"
-                        else:
+                        if not skip_cleanup:
+                            indent = var["indent"]
                             cleanup = f"{indent}{var['type']}__cleanup(&{var['name']});"
-                        result.insert(len(result) - 1, cleanup)
+                            result.insert(len(result) - 1, cleanup)
                     else:
                         new_active.insert(0, var)
+
                 active_vars = new_active
                 scope_statements.pop(scope_level, None)
                 scope_level -= 1

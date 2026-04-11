@@ -200,7 +200,7 @@ void bar()
 {
     cleanpop mut String greeting_1;
     String::set(&greeting_1, "Hello there!");
-    cleanpop String greeting_2;
+    cleanpop mut String greeting_2;
 
     if (String::equals(&greeting_1, &greeting_2))
     {
@@ -240,7 +240,7 @@ int some_number();
 
 void foofoo()
 {
-    cleanpop('A', some_number()) String str;
+    cleanpop('A', some_number()) mut String str;
     if (str.size > 5)
         return;
     
