@@ -1099,9 +1099,7 @@ def handle_cleanpop(code: str) -> str:
             if '=' in body:
                 raise ValueError(f"Invalid cleanpop (assignment not allowed): {line}")
 
-            # -------------------------
             # HARD RULE: const not allowed
-            # -------------------------
             if re.search(r'\bconst\b', body):
                 raise ValueError(f"Invalid cleanpop (const not allowed): {line}")
 
@@ -1140,22 +1138,18 @@ def handle_cleanpop(code: str) -> str:
             type_tokens = parts[:-1]
 
             type_name_no_const = " ".join(type_tokens)
-            type_name_full = type_name_no_const
 
             active_vars.append({
                 "name": var_name,
                 "type": type_name_no_const,
-                "is_const": False,
                 "scope": scope_level,
                 "indent": indent
             })
 
             # Declaration
-            result.append(f"{indent}{type_name_full} {var_name};{comment}")
+            result.append(f"{indent}{type_name_no_const} {var_name};{comment}")
 
-            # -------------------------
             # Populate call
-            # -------------------------
             if args_str is None:
                 result.append(f"{indent}{type_name_no_const}__populate(&{var_name});")
             else:
@@ -1172,6 +1166,47 @@ def handle_cleanpop(code: str) -> str:
             continue
 
         # -------------------------
+        # NEW: STRICT USAGE RULE (ADDED)
+        # -------------------------
+        def is_bare_usage(line, name):
+            i = 0
+            n = len(line)
+
+            while i < n:
+                if line[i].isalpha() or line[i] == '_':
+                    start = i
+                    while i < n and (line[i].isalnum() or line[i] == '_'):
+                        i += 1
+
+                    token = line[start:i]
+
+                    if token == name:
+                        prev = line[start - 1] if start > 0 else ' '
+
+                        # allowed contexts
+                        if prev == '&':
+                            continue
+                        if start > 1 and line[start - 2:start] == '->':
+                            continue
+                        if prev == '.':
+                            continue
+
+                        # standalone usage = illegal
+                        if prev in " (=[{,;:\t":
+                            return True
+                else:
+                    i += 1
+
+            return False
+
+        for var in active_vars:
+            if var["scope"] <= scope_level:
+                if is_bare_usage(code_line, var["name"]):
+                    raise ValueError(
+                        f"Invalid usage of cleanpop variable '{var['name']}' without '&'"
+                    )
+
+        # -------------------------
         # RETURN handling
         # -------------------------
         if has_return:
@@ -1185,7 +1220,6 @@ def handle_cleanpop(code: str) -> str:
                             f"Cannot return cleanpop variable '{ret_var}' (it will be cleaned up automatically)"
                         )
 
-            # Insert cleanup statements before return
             for var in reversed(active_vars):
                 if var["scope"] <= scope_level:
                     cleanup = f"{indent}{var['type']}__cleanup(&{var['name']});"
@@ -1194,7 +1228,7 @@ def handle_cleanpop(code: str) -> str:
             scope_statements[scope_level].append("return")
 
         # -------------------------
-        # Normal line (add back comment)
+        # Normal line
         # -------------------------
         if stripped:
             result.append(code_line.rstrip() + comment)
@@ -1233,20 +1267,21 @@ def add_braces_to_if_else(code: str) -> str:
     result = []
     n = len(lines)
     i = 0
-    in_macro = False  # Track multi-line macros
+    in_macro = False
 
     while i < n:
         line = lines[i]
         stripped = line.strip()
 
-        # Detect macro start
+        # -------------------------
+        # MACROS (unchanged)
+        # -------------------------
         if stripped.startswith('#define'):
             in_macro = True
             result.append(line)
             i += 1
             continue
 
-        # Track continuation of macro
         if in_macro:
             result.append(line)
             if not stripped.endswith('\\'):
@@ -1254,53 +1289,63 @@ def add_braces_to_if_else(code: str) -> str:
             i += 1
             continue
 
-        # Match 'if (...)' or 'else'
-        match = re.match(r'^(\s*)(if\s*\(.*?\)|else\b)(.*)', line)
-        if match:
-            indent = match.group(1)
-            keyword = match.group(2)
-            remainder = match.group(3).strip()
+        # -------------------------
+        # IF DETECTION
+        # -------------------------
+        if stripped.startswith("if"):
+            indent = re.match(r'^\s*', line).group(0)
 
-            # Already has braces on the same line? leave it
-            if remainder.startswith('{'):
-                result.append(line)
+            # -------------------------
+            # STEP 1: find full closing ')'
+            # -------------------------
+            paren = 0
+            start_i = i
+            found = False
+
+            while i < n:
+                segment = lines[i]
+
+                for ch in segment:
+                    if ch == '(':
+                        paren += 1
+                    elif ch == ')':
+                        paren -= 1
+
+                if paren == 0 and '(' in "".join(lines[start_i:i+1]):
+                    found = True
+                    break
+
                 i += 1
+
+            # move to next line after condition
+            i += 1
+
+            # skip blank lines
+            while i < n and lines[i].strip() == '':
+                i += 1
+
+            # -------------------------
+            # STEP 2: check for block
+            # -------------------------
+            if i < n and lines[i].strip().startswith('{'):
+                result.append(line)
                 continue
 
-            # Lookahead: skip empty lines to check if next line starts with '{'
-            j = i + 1
-            next_line_is_block = False
-            while j < n:
-                next_line_stripped = lines[j].strip()
-                if next_line_stripped == '':
-                    j += 1
-                    continue
-                if next_line_stripped.startswith('{'):
-                    next_line_is_block = True
-                break
+            # -------------------------
+            # STEP 3: wrap single statement
+            # -------------------------
+            body = lines[i] if i < n else ""
 
-            # If there is already a block, do nothing
-            if next_line_is_block:
-                result.append(line)
-                i += 1
-                continue
-
-            # Collect the statement (everything until the first semicolon)
-            statement = remainder
-            while ';' not in statement and i + 1 < n:
-                i += 1
-                statement += ' ' + lines[i].strip()
-            statement = statement.rstrip(';').strip()
-
-            # Wrap in braces
-            result.append(f"{indent}{keyword} {{")
-            result.append(f"{indent}    {statement};")
+            result.append(f"{indent}{line.strip()} {{")
+            result.append(f"{indent}    {body.strip()}")
             result.append(f"{indent}}}")
 
             i += 1
             continue
 
-        # Normal line
+        # -------------------------
+        # NORMAL LINE
+        # -------------------------
         result.append(line)
         i += 1
 

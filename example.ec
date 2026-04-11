@@ -193,31 +193,35 @@ void foo()
 {
     cleanpop mut String str;
     String::set(&str, "Hello there!");
-    printf("The greeting: %s\n", str.data);
+    String* str_view = &str;
+    printf("The greeting: %s\n", str_view->data);
 }
 
 void bar()
 {
     cleanpop mut String greeting_1;
+    String* greeting_1_view = &greeting_1;
     String::set(&greeting_1, "Hello there!");
+    
     cleanpop mut String greeting_2;
+    String* greeting_2_view = &greeting_2;
 
     if (String::equals(&greeting_1, &greeting_2))
     {
         cleanpop mut String doppelganger;
         String::set(&doppelganger, "Wow, they are doppelgangers!");
-        printf("%s\n", doppelganger.data);
+        printf("%s\n", (&doppelganger)->data);
         return;
     }
 
-    if (greeting_1.data == NULL || greeting_2.data == NULL)
+    if (greeting_1_view->data == NULL || greeting_2_view->data == NULL)
     {
         printf("Something went wrong");
         return;
     }
 
-    printf("Greeting 1: %s\n", greeting_1.data);
-    printf("Greeting 2: %s\n", greeting_2.data);
+    printf("Greeting 1: %s\n", greeting_1_view->data);
+    printf("Greeting 2: %s\n", greeting_2_view->data);
 
 }
 
@@ -232,7 +236,7 @@ void String::populate_with_1(check mut String* str, check char* c_string)
 void baz()
 {
     cleanpop("Initial string!") mut String str;
-    printf("Data: %s\n", str.data);
+    printf("Data: %s\n", (&str)->data);
 }
 
 void String::populate_with_2(check mut String* str, char c, int repeat_char_count);
@@ -241,7 +245,7 @@ int some_number();
 void foofoo()
 {
     cleanpop('A', some_number()) mut String str;
-    if (str.size > 5)
+    if ((&str)->size > 5)
         return;
     
     // do stuff
