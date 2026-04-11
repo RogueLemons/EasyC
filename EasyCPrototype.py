@@ -1086,22 +1086,45 @@ def handle_cleanpop(code: str) -> str:
         scope_statements.setdefault(scope_level, [])
 
         # -------------------------
-        # CLEANPOP (with arguments)
+        # CLEANPOP 
         # -------------------------
-        match = re.match(r'^(\s*)cleanpop(?:\((.*?)\))?\s+([^;]+);', code_line)
+        match = re.match(r'^(\s*)cleanpop(?:\((.*?)\))?\s+([^;=]+)(?:=(.*))?;', code_line)
         if match:
             indent = match.group(1)
             args_str = match.group(2)  # may be None
             body = match.group(3).strip()
+            assign_expr = match.group(4).strip() if match.group(4) else None
 
             if '*' in body:
                 raise ValueError(f"Invalid cleanpop (pointer not allowed): {line}")
-            if '=' in body:
+            if '=' in body and not assign_expr:
                 raise ValueError(f"Invalid cleanpop (assignment not allowed): {line}")
 
             # HARD RULE: const not allowed
             if re.search(r'\bconst\b', body):
                 raise ValueError(f"Invalid cleanpop (const not allowed): {line}")
+
+            # -------------------------
+            # MOVE detection
+            # -------------------------
+            move_populated = False
+            move_arg = None
+
+            if assign_expr:
+                assign_expr = assign_expr.strip()
+
+                move_match = re.match(
+                    r'^move\s*\(\s*&\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*$',
+                    assign_expr
+                )
+
+                if move_match:
+                    move_populated = True
+                    move_arg = move_match.group(1)
+                else:
+                    raise ValueError(
+                        f"Invalid cleanpop assignment (only move(&x) allowed): {line}"
+                    )
 
             # -------------------------
             # Parse arguments safely
@@ -1149,7 +1172,9 @@ def handle_cleanpop(code: str) -> str:
             # Declaration
             result.append(f"{indent}{type_name_no_const} {var_name};{comment}")
 
+            # -------------------------
             # Populate call
+            # -------------------------
             if args_str is None:
                 result.append(f"{indent}{type_name_no_const}__populate(&{var_name});")
             else:
@@ -1163,48 +1188,15 @@ def handle_cleanpop(code: str) -> str:
                         f"{indent}{type_name_no_const}__populate_with_{arg_count}({cast}, {args_joined});"
                     )
 
+            # -------------------------
+            # EXTRA MOVE CALL
+            # -------------------------
+            if move_populated:
+                result.append(
+                    f"{indent}{type_name_no_const}__move(&{move_arg}, &{var_name});"
+                )
+
             continue
-
-        # -------------------------
-        # NEW: STRICT USAGE RULE (ADDED)
-        # -------------------------
-        def is_bare_usage(line, name):
-            i = 0
-            n = len(line)
-
-            while i < n:
-                if line[i].isalpha() or line[i] == '_':
-                    start = i
-                    while i < n and (line[i].isalnum() or line[i] == '_'):
-                        i += 1
-
-                    token = line[start:i]
-
-                    if token == name:
-                        prev = line[start - 1] if start > 0 else ' '
-
-                        # allowed contexts
-                        if prev == '&':
-                            continue
-                        if start > 1 and line[start - 2:start] == '->':
-                            continue
-                        if prev == '.':
-                            continue
-
-                        # standalone usage = illegal
-                        if prev in " (=[{,;:\t":
-                            return True
-                else:
-                    i += 1
-
-            return False
-
-        for var in active_vars:
-            if var["scope"] <= scope_level:
-                if is_bare_usage(code_line, var["name"]):
-                    raise ValueError(
-                        f"Invalid usage of cleanpop variable '{var['name']}' without '&'"
-                    )
 
         # -------------------------
         # RETURN handling

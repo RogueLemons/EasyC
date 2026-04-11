@@ -251,12 +251,36 @@ void foofoo()
     // do stuff
 }
 
+// ========= cleanpop with move semantics =========
+
+String::move(check mut String* from, check mut String* to)
+{
+    if (to == from)
+    {
+        return;
+    }
+
+    String::cleanup(to);
+    *to = *from;
+    from->data = NULL;
+    from->size = 0;
+    from->capacity = 0;
+}
+
+void foobar()
+{
+    cleanpop("Start value") mut String str_1;
+    // do stuff
+    cleanpop mut String str_2 = move(&str_1);
+    // do more stuff
+}
+
 // ========= cleanpop macros and standard types =========
 
 #define int::populate(i) (*i) = 0
 #define int::cleanup(i) 
 
-void foobar()
+void foobaz()
 {
     cleanpop mut int i;
     // Do stuff

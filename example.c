@@ -296,12 +296,43 @@ void foofoo()
     String__cleanup(&str);
 }
 
+// ========= cleanpop with move semantics =========
+
+String__move(String* const from, String* const to)
+{
+    EC__NULL__CHECK(from);
+    EC__NULL__CHECK(to);
+    if (to == from)
+    {
+        return;
+    }
+
+    String__cleanup(to);
+    *to = *from;
+    from->data = NULL;
+    from->size = 0;
+    from->capacity = 0;
+}
+
+void foobar()
+{
+    String str_1;
+    String__populate_with_1(&str_1, "Start value");
+    // do stuff
+    String str_2;
+    String__populate(&str_2);
+    String__move(&str_1, &str_2);
+    // do more stuff
+    String__cleanup(&str_2);
+    String__cleanup(&str_1);
+}
+
 // ========= cleanpop macros and standard types =========
 
 #define int__populate(i) (*i) = 0
 #define int__cleanup(i)
 
-void foobar()
+void foobaz()
 {
     int i;
     int__populate(&i);

@@ -21,7 +21,7 @@ Ease-of-life features added in a simple proof-of-concept superset-transpiler to 
 - keyword **mut**: working as an inverted const, where everything is const by default unless mut is used
 - keyword **check**: if type is check then EC__CHECK__NULL(x) automatically called on next line (macro with default behavior, can be overridden)
 - keyword **typenum**: a typesafe enum with a struct under hood with macro definitions for values, if type has option = 5 then access with type::option, type::count and type::get added for bonus help, uses type::equals instead of ==
-- keyword **cleanpop**: variable initialized with cleanpop automatically calls type::populate(t) on next line, and before scope exits (and before return statements) calls type::cleanup(t), must be defined as functions or macros manually
+- keyword **cleanpop** and operator **move**: variable initialized with cleanpop automatically calls type::populate(t) on next line, and before scope exits (and before return statements) calls type::cleanup(t), must be defined as functions or macros manually
 
 EasyC source files end with ".ec" and EasyC header files end with ".eh".
 
@@ -617,12 +617,66 @@ void foofoo()
     String__cleanup(&str);
 }
 ```
+#### EasyC
+```c
+String::move(check mut String* from, check mut String* to)
+{
+    if (to == from)
+    {
+        return;
+    }
+
+    String::cleanup(to);
+    *to = *from;
+    from->data = NULL;
+    from->size = 0;
+    from->capacity = 0;
+}
+
+void foobar()
+{
+    cleanpop("Start value") mut String str_1;
+    // do stuff
+    cleanpop mut String str_2 = move(&str_1);
+    // do more stuff
+}
+```
+#### Transpiled C
+```c
+String__move(String* const from, String* const to)
+{
+    EC__NULL__CHECK(from);
+    EC__NULL__CHECK(to);
+    if (to == from)
+    {
+        return;
+    }
+
+    String__cleanup(to);
+    *to = *from;
+    from->data = NULL;
+    from->size = 0;
+    from->capacity = 0;
+}
+
+void foobar()
+{
+    String str_1;
+    String__populate_with_1(&str_1, "Start value");
+    // do stuff
+    String str_2;
+    String__populate(&str_2);
+    String__move(&str_1, &str_2);
+    // do more stuff
+    String__cleanup(&str_2);
+    String__cleanup(&str_1);
+}
+```
 
 
 # TODO
 - consider inverting keyword **check** so everything is check by default and make user use keyword **nullable** for pointers that may be null
-- consider disallowing variables (and arguments) to be assigned with **cleanpop** variables, only allowing assignment with a new move operator (not to arguments) which moves the cleanup logic to the new variable (which might require it clean itself up), otherwise only pointers allowed
-- IMPORTANT: fix **cleanpop** const variables, may not cast away the const
+- consider adding **cleanpop** const variables (could create mutable variable with weird name and a const pointer to it with users original name, or just tell users to create const pointer view variables)
 
 # Bugs
 As a prototype this mini-project will never be perfect, it is a proof of concept. But less acceptable bugs include
