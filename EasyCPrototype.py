@@ -420,8 +420,8 @@ def extract_c_types(code: str):
     for q in qualifiers:
         code = re.sub(rf'\b{q}\b', '', code)
 
-    # Remove mut/safe/cleanpop keywords
-    code = re.sub(r'\b(mut|safe)\b|\bcleanpop\s*(\([^)]*\))?', '', code)
+    # Remove mut/check/cleanpop keywords
+    code = re.sub(r'\b(mut|check)\b|\bcleanpop\s*(\([^)]*\))?', '', code)
 
     # Remove preprocessor lines
     code = re.sub(r'^.*#.*$', '', code, flags=re.MULTILINE)
@@ -562,18 +562,18 @@ def process_mut_const(code):
     return code
 
 # -----------------------------
-# Process safe pointers
+# Process check pointers
 # -----------------------------
-def validate_safe_functions(code):
+def validate_check_functions(code):
     """
-    Validates safe functions in C code.
+    Validates check functions in C code.
 
     Rules enforced:
-    1. Safe consistency between declaration and definition.
-    2. Safe functions must return pointer types.
-    3. All return statements in safe functions must be 'return <identifier>;'
+    1. check consistency between declaration and definition.
+    2. check functions must return pointer types.
+    3. All return statements in check functions must be 'return <identifier>;'
        with only letters, numbers, underscore.
-    4. Returned variable must be declared safe (argument or local variable).
+    4. Returned variable must be declared check (argument or local variable).
     """
 
     # -------------------------
@@ -581,7 +581,7 @@ def validate_safe_functions(code):
     # -------------------------
     definition_pattern = re.compile(
         r'^\s*'
-        r'(?P<safe>safe\s+)?'
+        r'(?P<check>check\s+)?'
         r'(?P<ret>[A-Za-z_][\w\s\*\d]*?)\s+'
         r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)'
         r'\s*\((?P<params>[^)]*)\)\s*'
@@ -591,7 +591,7 @@ def validate_safe_functions(code):
 
     declaration_pattern = re.compile(
         r'^\s*'
-        r'(?P<safe>safe\s+)?'
+        r'(?P<check>check\s+)?'
         r'(?P<ret>[A-Za-z_][\w\s\*\d]*?)\s+'
         r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)'
         r'\s*\((?P<params>[^)]*)\)\s*;',
@@ -619,61 +619,61 @@ def validate_safe_functions(code):
     # -------------------------
     for match in declaration_pattern.finditer(code):
         name = match.group("name")
-        is_safe = bool(match.group("safe"))
+        is_check = bool(match.group("check"))
         ret_type = match.group("ret").strip()
 
-        if is_safe and '*' not in ret_type:
+        if is_check and '*' not in ret_type:
             raise ValueError(
-                f"Function '{name}' is marked safe but return type is not a pointer: '{ret_type}'"
+                f"Function '{name}' is marked check but return type is not a pointer: '{ret_type}'"
             )
 
-        declarations[name] = {"safe": is_safe, "return_type": ret_type}
+        declarations[name] = {"check": is_check, "return_type": ret_type}
 
     # -------------------------
     # Parse definitions
     # -------------------------
     for match in definition_pattern.finditer(code):
         name = match.group("name")
-        is_safe = bool(match.group("safe"))
+        is_check = bool(match.group("check"))
         ret_type = match.group("ret").strip()
         body = match.group("body")
 
-        if is_safe and '*' not in ret_type:
+        if is_check and '*' not in ret_type:
             raise ValueError(
-                f"Function '{name}' is marked safe but return type is not a pointer: '{ret_type}'"
+                f"Function '{name}' is marked check but return type is not a pointer: '{ret_type}'"
             )
 
         # -------------------------
         # Parse arguments
         # -------------------------
-        safe_args = set()
+        check_args = set()
         args = [p.strip() for p in match.group("params").split(",") if p.strip()]
         for arg in args:
             tokens = re.findall(r'[A-Za-z_][A-Za-z0-9_]*', arg)
             if not tokens:
                 continue
             var_name = tokens[-1]
-            if arg.startswith("safe"):
-                safe_args.add(var_name)
+            if arg.startswith("check"):
+                check_args.add(var_name)
 
         # -------------------------
-        # Collect all safe local variables
+        # Collect all check local variables
         # -------------------------
         body_lines = body.splitlines()
-        safe_locals = set()
+        check_locals = set()
         for line in body_lines:
             line = line.strip()
             decl_match = var_decl_pattern.match(line)
             if decl_match:
                 var_name = decl_match.group("var")
                 prefix_keywords = decl_match.group("prefix").split()
-                if "safe" in prefix_keywords:
-                    safe_locals.add(var_name)
+                if "check" in prefix_keywords:
+                    check_locals.add(var_name)
 
         # -------------------------
         # Validate return statements
         # -------------------------
-        if is_safe:
+        if is_check:
             for ret_match in return_pattern.finditer(body):
                 ret_var = ret_match.group(1)
 
@@ -683,37 +683,37 @@ def validate_safe_functions(code):
                         f"Function '{name}' return '{ret_var}' is invalid, must be a single identifier"
                     )
 
-                # Must be declared safe
-                if ret_var not in safe_locals and ret_var not in safe_args:
+                # Must be declared check
+                if ret_var not in check_locals and ret_var not in check_args:
                     raise ValueError(
-                        f"Function '{name}' returns '{ret_var}' which is not safe "
-                        f"(not a safe argument or safe local)"
+                        f"Function '{name}' returns '{ret_var}' which is not check "
+                        f"(not a check argument or check local)"
                     )
 
-        definitions[name] = {"safe": is_safe, "return_type": ret_type}
+        definitions[name] = {"check": is_check, "return_type": ret_type}
 
     # -------------------------
-    # Safe consistency check
+    # check consistency check
     # -------------------------
     for name, decl in declarations.items():
         if name in definitions:
             defn = definitions[name]
-            if decl["safe"] != defn["safe"]:
+            if decl["check"] != defn["check"]:
                 raise ValueError(
                     f"Function '{name}' mismatch: declaration has "
-                    f"{'safe' if decl['safe'] else 'no safe'}, "
-                    f"but definition has {'safe' if defn['safe'] else 'no safe'}"
+                    f"{'check' if decl['check'] else 'no check'}, "
+                    f"but definition has {'check' if defn['check'] else 'no check'}"
                 )
 
     return {"declarations": declarations, "definitions": definitions}
 
-def add_safe_nullchecks_locals(code):
+def add_check_nullchecks_locals(code):
     lines = code.splitlines()
     output = []
 
     pattern = re.compile(
         r'^\s*'
-        r'(?P<prefix>safe\s+)?'            
+        r'(?P<prefix>check\s+)?'            
         r'(?P<type>[\w\s]+?)'              
         r'\s*\*\s*'
         r'(?P<const_after>\bconst\b\s*)?'
@@ -737,7 +737,7 @@ def add_safe_nullchecks_locals(code):
             continue
 
         if not const_after:
-            raise ValueError(f"Safe pointer must have const before variable: {var_name}")
+            raise ValueError(f"check pointer must have const before variable: {var_name}")
 
         output.append(line)
         indent = re.match(r'^\s*', line).group(0)
@@ -746,7 +746,7 @@ def add_safe_nullchecks_locals(code):
     return "\n".join(output)
 
 
-def add_safe_nullchecks_params(code):
+def add_check_nullchecks_params(code):
     lines = code.splitlines()
     output = []
 
@@ -800,10 +800,10 @@ def add_safe_nullchecks_params(code):
         params_str = params_match.group(1)
         param_list = [p.strip() for p in params_str.split(',') if p.strip()]
 
-        # Detect safe pointer parameters
+        # Detect check pointer parameters
         vars_to_check = []
         param_pattern = re.compile(
-            r'(?P<prefix>safe\s+)?'
+            r'(?P<prefix>check\s+)?'
             r'(?P<type>[\w\s]+?)'
             r'\s*\*\s*'
             r'(?P<const_after>\bconst\b\s*)?'
@@ -817,7 +817,7 @@ def add_safe_nullchecks_params(code):
                 const_after = m.group('const_after')
 
                 if prefix and not const_after:
-                    raise ValueError(f"Safe pointer parameter must have const: {var_name}")
+                    raise ValueError(f"check pointer parameter must have const: {var_name}")
 
                 if prefix:
                     vars_to_check.append(var_name)
@@ -832,26 +832,26 @@ def add_safe_nullchecks_params(code):
 
     return "\n".join(output)
 
-def has_safe_keyword(code):
+def has_check_keyword(code):
     """
-    Returns True if the keyword 'safe' is used anywhere in the code,
-    otherwise False. Only matches 'safe' as a full word.
+    Returns True if the keyword 'check' is used anywhere in the code,
+    otherwise False. Only matches 'check' as a full word.
     """
-    return bool(re.search(r'\bsafe\b', code))
+    return bool(re.search(r'\bcheck\b', code))
 
-def remove_safe_keyword(code):
+def remove_check_keyword(code):
     """
-    Removes all instances of the keyword 'safe' from the code,
+    Removes all instances of the keyword 'check' from the code,
     preserving all spacing, indentation, and formatting.
-    Does NOT remove 'safe' inside comments.
+    Does NOT remove 'check' inside comments.
     """
 
     # Pattern to match comments (//... or /* ... */)
     comment_pattern = re.compile(r'//.*?$|/\*.*?\*/', re.DOTALL | re.MULTILINE)
 
     def process_non_comment(text):
-        # Remove 'safe' as a whole word (with optional trailing space)
-        return re.sub(r'\bsafe\b\s?', '', text)
+        # Remove 'check' as a whole word (with optional trailing space)
+        return re.sub(r'\bcheck\b\s?', '', text)
 
     result = []
     last_end = 0
@@ -890,7 +890,7 @@ def find_last_include_line(code):
 def insert_nullcheck_macro_after_line(line_number, code):
     """
     Inserts the EC__NULL__CHECK macro block immediately after the specified line number.
-    Uses a safe macro that prints the file and line correctly.
+    Uses a check macro that prints the file and line correctly.
     """
     macro_block = (
         "#ifndef EC__NULL__CHECK\n"
@@ -927,12 +927,12 @@ def has_nullcheck_macro(code):
     pattern = re.compile(r'^\s*#define\s+EC__NULL__CHECK\b', re.MULTILINE)
     return bool(pattern.search(code))
 
-def process_safe_pointers(code):
-    validate_safe_functions(code)
-    code = add_safe_nullchecks_locals(code)
-    code = add_safe_nullchecks_params(code)
-    if has_safe_keyword(code) and not has_nullcheck_macro(code):
-        code = remove_safe_keyword(code)
+def process_check_pointers(code):
+    validate_check_functions(code)
+    code = add_check_nullchecks_locals(code)
+    code = add_check_nullchecks_params(code)
+    if has_check_keyword(code) and not has_nullcheck_macro(code):
+        code = remove_check_keyword(code)
         last_include_line = find_last_include_line(code)
         code = insert_nullcheck_macro_after_line(last_include_line, code)
 
@@ -1498,7 +1498,7 @@ def transpile_ec(code):
     code = process_prefixes(code)
     code = process_indef(code)
     code = process_mut_const(code)
-    code = process_safe_pointers(code)
+    code = process_check_pointers(code)
     code = process_cleanpop(code)
 
     # Cleanup and formatting

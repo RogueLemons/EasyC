@@ -83,18 +83,18 @@ void set_to_zero_if_negative(mut int* i_ptr)
     }
 }
 
-// ========= safe =========
+// ========= check =========
 
-float dereference_float(safe float* f_ptr)
+float dereference_float(check float* f_ptr)
 {
     return (*f_ptr);
 }
 
 static mut float ratio = 0.4;
 
-safe float* get_ratio()
+check float* get_ratio()
 {
-    safe float* result = &ratio;
+    check float* result = &ratio;
     return result;
 }
 
@@ -109,7 +109,7 @@ typestruct Color
 
 // ========= indef =========
 
-void Color::set::white(safe mut Color* col)
+void Color::set::white(check mut Color* col)
 {
     indef int MAX = 255;
     indef Color WHITE = { .r = MAX, .g = MAX, .b = MAX };
@@ -172,22 +172,22 @@ typestruct String
     unsigned int size;
     unsigned int capacity;
 };
-void String::populate(safe mut String* str)
+void String::populate(check mut String* str)
 {
     str->data = NULL;
     str->size = 0;
     str->capacity = 0;
 }
-void String::cleanup(safe mut String* str)
+void String::cleanup(check mut String* str)
 {
     free(str->data);
     str->data = NULL;
     str->size = 0;
     str->capacity = 0;
 }
-void String::set(safe mut String* target, safe char* c_string);
-void String::add(safe mut String* target, safe char* addition);
-int String::equals(safe String* str1, safe String* str2);
+void String::set(check mut String* target, check char* c_string);
+void String::add(check mut String* target, check char* addition);
+int String::equals(check String* str1, check String* str2);
 
 void foo()
 {
@@ -223,7 +223,7 @@ void bar()
 
 // ========= cleanpop with arguments =========
 
-void String::populate_with_1(safe mut String* str, safe char* c_string)
+void String::populate_with_1(check mut String* str, check char* c_string)
 {
     String::populate(str);
     String::set(str, c_string);
@@ -235,7 +235,7 @@ void baz()
     printf("Data: %s\n", str.data);
 }
 
-void String::populate_with_2(safe mut String* str, char c, int repeat_char_count);
+void String::populate_with_2(check mut String* str, char c, int repeat_char_count);
 int some_number();
 
 void foofoo()

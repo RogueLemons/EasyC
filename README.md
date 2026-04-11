@@ -5,7 +5,7 @@
   - [File inclusion and generated code warning](#file-inclusion-and-generated-code-warning)
   - [Organize functions with keyword prefix](#organize-functions-with-keyword-prefix)
   - [Const by default and keyword mut](#const-by-default-and-keyword-mut)
-  - [Pointers that are not null with keyword safe](#pointers-that-are-not-null-with-keyword-safe)
+  - [Automatic runtime pointer null check with keyword check](#automatic-runtime-pointer-null-check-with-keyword-check)
   - [Automatically typed structs with keyword typestruct](#automatically-typed-structs-with-keyword-typestruct)
   - [Inline definitions with keyword indef](#inline-definitions-with-keyword-indef)
   - [Type-safe enums with keyword typenum](#type-safe-enums-with-keyword-typenum)
@@ -19,7 +19,7 @@ Ease-of-life features added in a simple proof-of-concept superset-transpiler to 
 - keyword **indef**: to write define statements inside of functions to keep local values local
 - keyword **prefix**: working similar to C++ namespace to avoid long struct and function names
 - keyword **mut**: working as an inverted const, where everything is const by default unless mut is used
-- keyword **safe**: if type is safe then EC__CHECK__NULL(x) automatically called on next line (macro with default behavior, can be overridden)
+- keyword **check**: if type is check then EC__CHECK__NULL(x) automatically called on next line (macro with default behavior, can be overridden)
 - keyword **typenum**: a typesafe enum with a struct under hood with macro definitions for values, if type has option = 5 then access with type::option, type::count and type::get added for bonus help, uses type::equals instead of ==
 - keyword **cleanpop**: variable initialized with cleanpop automatically calls type::populate(t) on next line, and before scope exits (and before return statements) calls type::cleanup(t), must be defined as functions or macros manually
 
@@ -215,19 +215,19 @@ void set_to_zero_if_negative(int* const i_ptr)
 }
 ```
 
-## Pointers that are not null with keyword safe
+## Automatic runtime pointer null check with keyword check
 #### EasyC
 ```c
-float dereference_float(safe float* f_ptr)
+float dereference_float(check float* f_ptr)
 {
     return (*f_ptr);
 }
 
 static mut float ratio = 0.4;
 
-safe float* get_ratio()
+check float* get_ratio()
 {
-    safe float* result = &ratio;
+    check float* result = &ratio;
     return result;
 }
 ```
@@ -285,7 +285,7 @@ typedef struct Color Color;
 ## Inline definitions with keyword indef
 #### EasyC
 ```c
-void Color::set::white(safe mut Color* col)
+void Color::set::white(check mut Color* col)
 {
     indef int MAX = 255;
     indef Color WHITE = { .r = MAX, .g = MAX, .b = MAX };
@@ -416,20 +416,20 @@ typestruct String
     unsigned int size;
     unsigned int capacity;
 };
-void String::populate(safe mut String* str)
+void String::populate(check mut String* str)
 {
     str->data = NULL;
     str->size = 0;
     str->capacity = 0;
 }
-void String::cleanup(safe mut String* str)
+void String::cleanup(check mut String* str)
 {
     free(str->data);
     str->data = NULL;
     str->size = 0;
     str->capacity = 0;
 }
-void String::set(safe mut String* target, safe char* c_string);
+void String::set(check mut String* target, check char* c_string);
 ```
 #### Transpiled C
 ```c
@@ -481,8 +481,8 @@ void foo()
 
 #### EasyC
 ```c
-void String::add(safe mut String* target, safe char* addition);
-void String::equals(safe String* str1, safe String* str2);
+void String::add(check mut String* target, check char* addition);
+void String::equals(check String* str1, check String* str2);
 
 void bar()
 {
@@ -551,7 +551,7 @@ void bar()
 ```
 #### EasyC
 ```C
-void String::populate_with_1(safe mut String* str, safe char* c_string)
+void String::populate_with_1(check mut String* str, check char* c_string)
 {
     String::populate(str);
     String::set(str, c_string);
@@ -563,7 +563,7 @@ void baz()
     printf("Data: %s\n", str.data);
 }
 
-void String::populate_with_2(safe mut String* str, char c, int repeat_char_count);
+void String::populate_with_2(check mut String* str, char c, int repeat_char_count);
 int some_number();
 
 void foofoo()
@@ -612,8 +612,7 @@ void foofoo()
 
 
 # TODO
-- rename keyword **safe** (perhaps **check**?)
-- invert keyword **safe** so everything is safe by default and make user use keyword **nullable** for pointers that may be null
+- invert keyword **check** so everything is check by default and make user use keyword **nullable** for pointers that may be null
 - consider disallowing variables (and arguments) to be assigned with **cleanpop** variables, only allowing assignment with a new move operator (not to arguments) which moves the cleanup logic to the new variable (which might require it clean itself up), otherwise only pointers allowed
 - IMPORTANT: fix **cleanpop** const variables, may not cast away the const
 

@@ -95,7 +95,7 @@ void set_to_zero_if_negative(int* const i_ptr)
     }
 }
 
-// ========= safe =========
+// ========= check =========
 
 float dereference_float(const float* const f_ptr)
 {
