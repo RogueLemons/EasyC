@@ -10,7 +10,6 @@ A plug-and-play header library that must only be added to your include folder in
 A simple header that includes all other headers.
 
 ### ec_static_assert.h
-
 A tiny, portable compile-time assertion macro for C:  
 `EC_STATIC_ASSERT(condition, message)`
 
@@ -18,7 +17,6 @@ Supports C11 (`_Static_assert`), MSVC (`static_assert`), and older C via a fallb
 *Note: `message` must be a valid identifier.*
 
 #### Example
-
 ```c
 #include "ec_static_assert.h"
 
@@ -26,7 +24,6 @@ EC_STATIC_ASSERT(sizeof(int) == 4, int_must_be_4_bytes);
 ```
 
 ### ec_inline.h
-
 A tiny, portable inline abstraction layer for C.
 
 Provides:
@@ -36,7 +33,6 @@ Provides:
 Supports C89+, C99 inline, and MSVC/GCC/Clang.
 
 #### Example
-
 ```c
 #include "ec_inline.h"
 
@@ -46,21 +42,26 @@ EC_HEADER_SAFE int square(int x) {
 ```
 
 ### ec_typenum.h
-
 A tiny, header-safe, and type-safe enum-like system for C using X-macros (no actual `enum`).
 
-Avoids C `enum` to ensure a fixed, explicit underlying type (ABI stability) and predictable behavior across compilers.
-
-Expects a basic underlying type (e.g. `int`, `char`) that works with `switch` statements and `==`.  
+It replaces C enums to give a fixed, explicit underlying type, ensuring predictable behavior and ABI stability across compilers. It expects a basic underlying type (e.g. `int`, `char`) that works with `switch` statements and `==`.  
 The value list must be defined as an X-macro (`LIST(X, Type)` pattern).
 
-Defines strongly-typed values, constants, and helpers like `*_get`, `*_eq`, and `*_to_string`, all without linker issues.
+Provides:
+- Strongly-typed enum-like values
+- Named constants for each entry
+- Helper functions like `*_get`, `*_eq`, and `*_to_string`
+- No reliance on compiler enum layout or linker tricks
 
 Use `EC_TYPENUM_FULL(Type, underlying_type, LIST)` as the main entry point.  
-Lower-level macros (`EC_TYPENUM`, `EC_TYPENUM_TO_STRING`, `EC_TYPENUM_GENERATE_CONSTS`) can also be used individually to only include exactly what you want in your header.
+Lower-level macros (`EC_TYPENUM`, `EC_TYPENUM_TO_STRING`, `EC_TYPENUM_GENERATE_CONSTS`) can be used individually to include only the parts you need.
+
+#### Why typenum?
+C enums are compiler-defined and not guaranteed to have a stable or explicit underlying type, which can lead to portability issues and weak ABI guarantees. This system replaces them with a controlled, struct-based representation that makes the underlying type explicit, while still behaving like an enum at the API level.
+
+By generating values from X-macros, the type definition, constants, and helper functions all stay synchronized from a single source of truth, reducing duplication and preventing mismatches between declarations and behavior.
 
 #### Example
-
 ```c
 #include "ec_typenum.h"
 
@@ -107,33 +108,17 @@ static const Status Status_Error = {1};
 ```
 
 ### ec_opaque_storage.h
-
-A tiny, portable opaque-struct system for C that enables true encapsulation while still allowing stack allocation (no heap required).
-
-It provides a way to define *storage-only types* in headers while hiding their real implementation in `.c` files.
+A tiny, portable opaque-struct system for C that enables true encapsulation while still allowing stack allocation (no heap required). It provides a way to define *storage-only types* in headers while hiding their real implementation in `.c` files.
 
 This is useful because it:
 - Enforces encapsulation (users cannot access fields directly)
 - Allows stack allocation without exposing internal layout
 - Adds compile-time checks for size and alignment (ABI safety)
 
-Expects you to define a fixed `size` and `alignment` for the type.
-
----
+Expects you to define a fixed `size` and `alignment` for the type. You create it with `EC_OPAQUE_STORAGE(Type, ALIGNMENT, SIZE)` in the header and `EC_OPAQUE_DEFINE(Type, ALIGNMENT, SIZE)` in the source.
 
 #### Why opaque structs?
-
-C normally exposes struct layout in headers, which means:
-- Any change breaks ABI compatibility
-- Internal details leak into every user file
-- You lose control over invariants
-
-Opaque structs solve this by:
-- Hiding the real structure definition
-- Forcing all access through functions
-- Allowing internal changes without breaking user code
-
----
+C usually exposes struct layouts in headers, which ties every user of the type to its internal representation, making changes ABI-breaking and leaking implementation details everywhere. Opaque structs avoid this by hiding the actual structure and only exposing a handle, forcing all access through functions. This keeps internal values fully private, prevents direct modification, and allows the implementation to change freely without breaking user code.
 
 #### Example
 
@@ -185,7 +170,6 @@ if (color_get_red(&c) > 50)
 ```
 
 ##### Expansion
-
 `EC_OPAQUE_STORAGE(Color, COLOR_ALIGN, COLOR_SIZE)` expands to:
 
 ```c
@@ -198,6 +182,72 @@ typedef struct {
 `EC_OPAQUE_DEFINE` is required in the `.c` file because it performs compile-time validation of the real `struct Color` definition. It ensures that the actual struct’s size and alignment match the declared `COLOR_SIZE` and `COLOR_ALIGN`. Without this check, there is no guarantee that the internal implementation fits the opaque storage, which can lead to ABI mismatches or undefined behavior.
 
 ### ec_result.h
+A tiny, portable `Result<T, E>` type for C with safe error handling and lightweight monadic-style propagation. Works with C99+, and is fully compatible with GCC, Clang, and MSVC.
+
+Provides:
+- A `Result` struct with `ok` state
+- Automatic `ok` / `err` constructors
+- Safe access macros
+- `TRY`-style early return propagation with compile-time result-type checking
+
+#### Why result types?
+This system provides a clear and explicit way to handle errors in C by turning error handling into an “exception-by-return-value” pattern. Instead of relying on hidden control flow, every function call explicitly returns either a success value or an error that must be handled. This makes failure states impossible to ignore and keeps control flow predictable and easy to reason about. A coder might use it to write safer systems-level code where errors are expected and must be propagated cleanly through multiple layers of logic.
+
+#### Example
+
+##### Header
+```c
+#include <stdio.h>
+#include "ec_result.h"
+
+EC_RESULT_TYPE(CharResult, char, int)
+```
+
+##### Usage
+```c
+#include "char_result.h"
+
+CharResult get_letter(int ok) {
+    CharResult r = ok ? CharResult_ok('A') : CharResult_err(-1);
+    // Return early for error
+    EC_TRY_RETURN_AS(CharResult, r);
+    // Do stuff for r being valid
+    return r;
+}
+
+int main() {
+    CharResult r = get_letter(1);
+    if (EC_RESULT_IS_OK(r)) {
+        printf("%c\n", EC_RESULT_VALUE(r));
+    } else {
+        printf("Error: %d\n", EC_RESULT_ERROR(r));
+    }
+    return 0;
+}
+```
+
+`EC_RESULT_IS_OK`, `EC_RESULT_VALUE`, and `EC_RESULT_ERROR` provide safe access to the result state and its data. The design avoids exceptions by making error handling explicit, while keeping the API ergonomic and easy to use. `EC_TRY_RETURN_ERR_AS` enables early-return error propagation when chaining operations.
+
+##### Expansion
+`EC_RESULT_TYPE(CharResult, char, int)` expands to:
+
+```c
+typedef struct {
+    int ok;
+    union {
+        char value;
+        int error;
+    } data;
+} CharResult;
+
+EC_HEADER_SAFE CharResult CharResult_ok(char v) {
+    return (CharResult){ .ok = 1, .data.value = v };
+}
+
+EC_HEADER_SAFE CharResult CharResult_err(int e) {
+    return (CharResult){ .ok = 0, .data.error = e };
+}
+```
 
 # TODO
 
