@@ -1,7 +1,14 @@
 # EasyC Lib
 A small C library for writing safer, more consistent C code.
 
-Includes a header-only utility library and a planned static analysis parser for additional warnings and safety checks.
+It is a header-only utility library and a code analysis parser is planned for additional warnings and safety checks.
+
+Includes:
+- Compile-time assertions (`ec_static_assert.h`)
+- Inline and header safety abstractions (`ec_inline.h`)
+- Type-safe enum replacement (`ec_typenum.h`)
+- Opaque struct storage for encapsulation (`ec_opaque_storage.h`)
+- Result-based error handling (`ec_result.h`)
 
 ## Table of Contents
 * [Overview](#easyc-lib)
