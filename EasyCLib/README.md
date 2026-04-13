@@ -9,3 +9,4 @@ A plug-and-play header library that must only be added to your include folder in
 ### ec_static_assert.h
 ### ec_inline.h
 ### ec_typenum.h
+### ec_opaque_storage.h

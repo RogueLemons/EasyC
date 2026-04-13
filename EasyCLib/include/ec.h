@@ -4,5 +4,6 @@
 #include "ec_static_assert.h"
 #include "ec_inline.h"
 #include "ec_typenum.h"
+#include "ec_opaque_storage.h"
 
 #endif // EC_H
