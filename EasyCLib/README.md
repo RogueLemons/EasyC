@@ -17,6 +17,7 @@ A plug-and-play header library that must only be added to your include folder in
 
 ## Lib
 - Document the headers (what and why) and give examples on how to use
+- Add EC_TYPENUM_FULL_HEADER and EC_TYPENUM_FULL_SOURCE macros that allow users to static const and static inline in their header
 
 ## Parser
 Parser must be implemented to transfer goals of EasyCTranspiler into a warning/suggestion system for pure C code.
@@ -24,7 +25,7 @@ Parser must be implemented to transfer goals of EasyCTranspiler into a warning/s
 It shall
 - Tokenize code properly and use no naive regex tricks.
 - Verify const correctness of variables (possibly ignoring variables used in functions as first iteration).
-- Make all mutable pointer function arguments start their names with out_ for maximum clarity (or move_ to show a transfer of ownership).
+- Make all mutable pointer function arguments start their names with out_ for maximum clarity (or in_, own_, or move_, to show a transfer of ownership).
 - Warn against using enum.
 - Look at file path and if file path is included in names (e.g. function or struct) then suggest splitting by __ (optionally user defined) to mimic namespaces and improve readability, also warn if name contains e.g. 7 underscores.
 - Verify all structs immediately contain a typedef statement on next line.
