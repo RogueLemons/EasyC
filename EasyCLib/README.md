@@ -248,7 +248,7 @@ EC_RESULT_TYPE(CharResult, char, int)
 CharResult get_letter(int ok) {
     CharResult r = ok ? CharResult_ok('A') : CharResult_err(-1);
     // Return early for error
-    EC_TRY_RETURN_AS(CharResult, r);
+    EC_TRY_RETURN_ERR_AS(CharResult, r);
     // Do stuff for r being valid
     return r;
 }
