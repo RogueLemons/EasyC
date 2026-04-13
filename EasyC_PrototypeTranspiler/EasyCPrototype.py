@@ -1426,7 +1426,7 @@ def remove_const_from_non_pointer_returns(code: str) -> str:
         params = match.group("params")
         ending = match.group("ending")
 
-        # If NO pointer in return type → remove 'const'
+        # If NO pointer in return type -> remove 'const'
         if '*' not in ret:
             ret = re.sub(r'\bconst\b\s*', '', ret)
 
@@ -1505,7 +1505,7 @@ def standardize_indentation(code: str, spaces_per_level: int = 4) -> str:
 def fix_if_spacing(code: str) -> str:
     """
     Ensure there is a space between 'if' and '(' in C code.
-    Converts 'if(...)' → 'if (...)'.
+    Converts 'if(...)' -> 'if (...)'.
     """
     # Pattern: match 'if' followed immediately by '(' (not preceded by other letters)
     pattern = re.compile(r'\bif\(')
