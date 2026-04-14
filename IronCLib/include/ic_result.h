@@ -6,7 +6,7 @@
 IC_RESULT.H
 
 C Compatibility:
-- C99: fully supported
+- C89: supported
 - C11+: recommended
 - GCC / Clang / MSVC supported
 
@@ -17,7 +17,7 @@ Dependencies:
 Design:
 - Result<T,E> type
 - automatic constructor generation
-- safe TRY propagation with compile-time type check
+- TRY propagation that is type-safe via assignment rules
 
 -------------------------------------------------------------------------------
 
@@ -71,12 +71,18 @@ This macro generates:
         } data; \
     } name; \
     \
-    IC_HEADER_FUNC name name##_ok(const value_type v) { \
-        return (name){ .ok = 1, .data.value = v }; \
+    IC_HEADER_FUNC name name##_ok(value_type v) { \
+        name r; \
+        r.ok = 1; \
+        r.data.value = v; \
+        return r; \
     } \
     \
-    IC_HEADER_FUNC name name##_err(const error_type e) { \
-        return (name){ .ok = 0, .data.error = e }; \
+    IC_HEADER_FUNC name name##_err(error_type e) { \
+        name r; \
+        r.ok = 0; \
+        r.data.error = e; \
+        return r; \
     }
 
 
@@ -93,16 +99,15 @@ This macro generates:
   TRY PROPAGATION WITH TYPE SAFETY CHECK
 
 - early return on error
-- compile-time compatibility check via struct initialization trick
 - zero runtime overhead in optimized builds
 
 ==============================================================================*/
 
 #define IC_TRY_RETURN_ERR_AS(type, result) \
     do { \
-        if (!(result).ok) { \
-            (void)((type){ .data.error = (result).data.error }); \
-            return type##_err((result).data.error); \
+        type const ic_try_res = (result); \
+        if (!ic_try_res.ok) { \
+            return type##_err(ic_try_res.data.error); \
         } \
     } while (0)
 
