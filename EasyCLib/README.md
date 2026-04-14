@@ -112,7 +112,7 @@ EC_TYPENUM_FULL(Status, int, STATUS_LIST)
 Status s = Status_Ok;
 
 if (Status_eq(s, Status_Error)) {
-    // ...
+    // Do stuff
 }
 
 const char* msg = Status_to_string(s);
@@ -136,7 +136,7 @@ EC_HEADER_SAFE const char* Status_to_string(const Status v) {
     switch (Status_get(v)) {
         case 0: return "Everything is fine";
         case 1: return "Something went wrong";
-        default: return "Invalid";
+        default: return "Unknown Status";
     }
 }
 
