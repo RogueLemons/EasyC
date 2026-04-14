@@ -13,7 +13,7 @@ Includes:
 ## Table of Contents
 * [Overview](#ironclib)
 * [Header Library](#header-library)
-  * [ec.h](#ech)
+  * [ic.h](#ich)
   * [ic_static_assert.h](#ic_static_asserth)
   * [ic_inline.h](#ic_inlineh)
   * [ic_typenum.h](#ic_typenumh)
@@ -30,7 +30,7 @@ It provides a set of portable utilities that abstract away common inconsistencie
 
 This library does not aim to build a macro language inside C. Instead, it focuses on small, necessary, and practical abstractions that make writing safe, consistent C code easier without hiding the language itself.
 
-### ec.h
+### ic.h
 A simple header that includes all other headers.
 
 ### ic_static_assert.h
