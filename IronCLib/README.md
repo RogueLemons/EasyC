@@ -1,4 +1,4 @@
-# IronC Lib
+# IronCLib
 A small C library for writing safer, more consistent C code.
 
 It is a header-only utility library and a code analysis parser is planned for additional warnings and safety checks.
@@ -11,7 +11,7 @@ Includes:
 - Result-based error handling (`ic_result.h`)
 
 ## Table of Contents
-* [Overview](#ironc-lib)
+* [Overview](#ironclib)
 * [Header Library](#header-library)
   * [ec.h](#ech)
   * [ic_static_assert.h](#ic_static_asserth)
