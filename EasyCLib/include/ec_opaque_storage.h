@@ -99,7 +99,7 @@ Alignment support
 
 #else
     #define EC_ALIGNAS(x)
-    #define EC_ALIGNOF(x) sizeof(x)
+    #define EC_ALIGNOF(x) (offsetof(struct { char c; x member; }, member))
 #endif
 
 

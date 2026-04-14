@@ -93,6 +93,8 @@ It provides:
 
 It expects a basic underlying type (e.g. `int`, `char`) that works with `switch` statements and `==` and the value list must be defined as an X-macro (`LIST(X, Type)` pattern). Use `EC_TYPENUM_FULL(Type, underlying_type, LIST)` as the main entry point. Lower-level macros (`EC_TYPENUM`, `EC_TYPENUM_TO_STRING`, `EC_TYPENUM_GENERATE_CONSTS`) can be used individually to include only the parts you need.
 
+*Note: User is in charge of making sure no duplicate values.*
+
 #### Why use this?
 It exists because C enums do not guarantee a fixed underlying type and are compiler-defined, which reduces portability and ABI stability. This abstraction makes it possible to define enum-like types with explicit underlying representation while keeping values, strings, and helpers synchronized from a single source. This results in safer, more predictable enum-like behavior with reduced duplication and fewer mismatch errors.
 
@@ -288,7 +290,15 @@ EC_HEADER_SAFE CharResult CharResult_err(int e) {
 # TODO
 
 ## Lib
-- Add EC_TYPENUM_FULL_HEADER and EC_TYPENUM_FULL_SOURCE macros that allow users to static const and static inline in their header
+- Add EC_TYPENUM_FULL_HEADER and EC_TYPENUM_FULL_SOURCE macros that allow users to static const and static inline in their header or function defintions and extern varibles
+- Consider adding a macro tag for EC_TYPENUM that converts everything to a simple typedef of the inner type
+- Add validation to typenum that inner type is basic type
+- Add optional system to opaque storage that can be turned on and off with a macro tag, that includes EC_OPAQUE_LOAD and EC_OPAQUE_STORE that handles aliasing safety through hard-copying internal bytes, but will without the tag just to fast pointer casting
+- Make EC_RESULT C99 documented or implement fallback constructor for C89 compliance without designated initializer ((Pos){.x=0, .y=1})
+- Add debug mode that uses runtime assert that can be turned off with macro tag (e.g. for accessing Result types)
+- Consider removing result accessors (e.g. EC_RESULT_VALUE) and replace with functions for const safety (maybe overkill? Could include asserts)
+- Add tests that can be verified on multiple compilers
+- Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser ForgeC because it helps create strong-like-metal C
 - Add example and guidance for creating a strong system linking together EasyC result types, typenums, and structs. 
 
 ## Parser

@@ -89,7 +89,7 @@ To-string support (switch-based, user-defined strings)
     { \
         switch (Type##_get(v)) { \
             LIST(EC_TYPENUM_TO_STRING_CASE, Type) \
-            default: return "Invalid"; \
+            default: return "Unknown " #Type; \
         } \
     }
 
