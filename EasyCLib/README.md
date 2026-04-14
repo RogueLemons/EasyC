@@ -37,7 +37,7 @@ A simple header that includes all other headers.
 A tiny, portable compile-time assertion macro for C.
 
 It provides:
-- `EC_STATIC_ASSERT(condition, message)` (*Note: `message` must be a valid identifier*)
+- `EC_STATIC_ASSERT(condition, message)`
 - Support for C11 `_Static_assert`
 - MSVC `static_assert` compatibility
 - Fallback for older C standards
@@ -51,15 +51,15 @@ It exists because C does not provide a consistent, cross-compiler mechanism for 
 ```c
 #include "ec_static_assert.h"
 
-EC_STATIC_ASSERT(sizeof(int) == 4, int_must_be_4_bytes);
+EC_STATIC_ASSERT(sizeof(int) == 4, "int must be 4 bytes");
 ```
 
 ##### Expansion
 ```c
 // e.g. this for modern compilers
-static_assert(sizeof(int) == 4, "int_must_be_4_bytes");
-// or this for older (or barebone) compilers
-typedef char static_assert_failed_int_must_be_4_bytes[(sizeof(int) == 4) ? 1 : -1];
+static_assert(sizeof(int) == 4, "int must be 4 bytes");
+// or this for older (or barebone) compilers, __LINE__ = 3 in example
+typedef char static_assert_failed_at_line_3[(sizeof(int) == 4) ? 1 : -1];
 ```
 
 ### ec_inline.h

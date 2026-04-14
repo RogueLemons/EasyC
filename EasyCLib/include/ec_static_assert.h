@@ -11,28 +11,28 @@ C Version Compatibility:
 - Pre-C11: fallback typedef trick
 
 Usage:
-    EC_STATIC_ASSERT(sizeof(int) == 4, int_must_be_4_bytes);
+    EC_STATIC_ASSERT(sizeof(int) == 4, "int must be 4 bytes");
 
-The message must be a valid identifier (no spaces).
+For compilers without native static assert support, this will cause a compile-time error if the condition is false, but the error message may be less clear.
 ===============================================================================
 */
 
 // glue helpers
-#define EC_SA_GLUE(a,b) a##b
-#define EC_SA_XGLUE(a,b) EC_SA_GLUE(a,b)
+#define EC_INTERNAL_SA_GLUE(a,b) a##b
+#define EC_INTERNAL_SA_XGLUE(a,b) EC_INTERNAL_SA_GLUE(a,b)
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 
-    #define EC_STATIC_ASSERT(cond, msg) _Static_assert(cond, #msg)
+    #define EC_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && _MSC_VER >= 1600
 
-    #define EC_STATIC_ASSERT(cond, msg) static_assert(cond, #msg)
+    #define EC_STATIC_ASSERT(cond, msg) static_assert(cond, msg)
 
 #else
 
     #define EC_STATIC_ASSERT(cond, msg) \
-        typedef char EC_SA_XGLUE(static_assert_failed_##msg##_at_line_, __LINE__) \
+        typedef char EC_INTERNAL_SA_XGLUE(static_assert_failed_at_line_, __LINE__) \
         [(cond) ? 1 : -1]
 
 #endif
