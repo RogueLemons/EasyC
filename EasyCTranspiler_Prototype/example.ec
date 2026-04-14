@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "example/easyc/file.eh"
+#include "example/easyc/file.alh"
 #include "normal/c/file.h"
 
 // ========= prefix =========

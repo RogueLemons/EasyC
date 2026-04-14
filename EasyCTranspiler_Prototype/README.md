@@ -1,5 +1,5 @@
-# EasyC (Prototype)
-EasyC is a small superset of C that transpiles to plain C, adding a few keywords to improve safety, readability, and consistency.
+# AlloyC (Prototype)
+AlloyC is a small superset of C that transpiles to plain C, adding a few keywords to improve safety, readability, and consistency.
 
 It focuses on portability and predictable, easy-to-read output, making C safer by default through simple transformations.
 
@@ -25,15 +25,15 @@ It focuses on portability and predictable, easy-to-read output, making C safer b
 
 ### Quick Start
 
-EasyC is a **file-by-file transpiler**:
+AlloyC is a **file-by-file transpiler**:
 
-* `.ec` -> `.c`
-* `.eh` -> `.h`
+* `.alc` -> `.c`
+* `.alh` -> `.h`
 
 Run with:
 
 ```bash
-python EasyCPrototype.py input.ec output.c
+python AlloyCPrototype.py input.alc output.c
 ```
 
 ### Keywords
@@ -49,7 +49,7 @@ python EasyCPrototype.py input.ec output.c
 
 #### Demo 1 — const by default, mut, and check
 
-##### EasyC
+##### AlloyC
 
 ```c
 int clamp(int value, int min, int max)
@@ -73,10 +73,10 @@ float dereference(check float* f_ptr)
 ##### Transpiled C
 
 ```c
-#ifndef EC__NULL__CHECK
+#ifndef ALC__NULL__CHECK
 #include <stdio.h>
 #include <stdlib.h>
-#define EC__NULL__CHECK(x) \
+#define ALC__NULL__CHECK(x) \
 do { \
     if ((x) == NULL) { \
         fprintf(stderr, "File %s - Line %d had illegal null pointer, now exiting...\n", __FILE__, __LINE__); \
@@ -99,7 +99,7 @@ int clamp(const int value, const int min, const int max)
 
 float dereference(const float* const f_ptr)
 {
-    EC__NULL__CHECK(f_ptr);
+    ALC__NULL__CHECK(f_ptr);
     return (*f_ptr);
 }
 ```
@@ -113,7 +113,7 @@ float dereference(const float* const f_ptr)
 
 #### Demo 2 — typestruct and cleanpop
 
-##### EasyC
+##### AlloyC
 
 ```c
 typestruct String
@@ -164,33 +164,33 @@ As a prototype this mini-project will never be perfect. It is a proof of concept
 
 It started with the idea "What if C variables were const by default?". Since the project is just a proof of concept it serves more as a way to talk about what code safety is and means in C, and what practices can be applied to write safe C code in a standardize style for the whole group. 
 
-"Why use this instead of C++?" I hear you ask. C++ already exists. Nim already exists. C3 already exists. There are better tools and solutions than EasyC out there already. However, C programmers are often really happy about C specifically so converting them to a new language, even if it was deemed better (by whatever metric), is going to be difficult. But letting C coders continue to write C code but with just a few added keywords is an easier sell. It is also not just a people question; it is about compatability. Not all processors come with compilers for C++ or whatever language you might prefer, and gcc might have amazing added features to the language which might not be supported by other compilers a group moves to, so it becomes a matter of portability. Furthermore, with this transpiler the goal becomes to help write safe and readable code, both in the EasyC files and their transpiled C files, so it becomes a way to standardize how the code should look like and avoid easy-to-make mistakes. 
+"Why use this instead of C++?" I hear you ask. C++ already exists. Nim already exists. C3 already exists. There are better tools and solutions than AlloyC out there already. However, C programmers are often really happy about C specifically so converting them to a new language, even if it was deemed better (by whatever metric), is going to be difficult. But letting C coders continue to write C code but with just a few added keywords is an easier sell. It is also not just a people question; it is about compatability. Not all processors come with compilers for C++ or whatever language you might prefer, and gcc might have amazing added features to the language which might not be supported by other compilers a group moves to, so it becomes a matter of portability. Furthermore, with this transpiler the goal becomes to help write safe and readable code, both in the AlloyC files and their transpiled C files, so it becomes a way to standardize how the code should look like and avoid easy-to-make mistakes. 
 
 ## Features and Examples
-The following examples are taken directly from the files [example.ec](example.ec) and [example.c](example.c) in in this repo, and showcase how to use these keywords. 
+The following examples are taken directly from the files [example.alc](example.alc) and [example.c](example.c) in in this repo, and showcase how to use these keywords. 
 
 ### File inclusion and generated code warning
-All generated files come with a generation warning and automatically converts .eh and .ec file includes to .h and .c respectively.
+All generated files come with a generation warning and automatically converts .alh and .alc file includes to .h and .c respectively.
 
 #### Example
-##### EasyC
+##### AlloyC
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "example/easyc/file.eh"
+#include "example/easyc/file.alh"
 #include "normal/c/file.h"
 ```
 ##### Transpiled C
 ```c
-// ===================================================
-// === WARNING! DO NOT EDIT THIS FILE! ===============
-// === This code was generated by EasyC (Prototype) ==
-// === and transpiled from an input file =============
-// ===================================================
+// =====================================================
+// === WARNING! DO NOT EDIT THIS FILE! =================
+// === This code was generated by AlloyC (Prototype) ===
+// === and transpiled from an input file ===============
+// =====================================================
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "example/easyc/file.h"
+#include "example/alloyc/file.h"
 #include "normal/c/file.h"
 ```
 
@@ -198,7 +198,7 @@ All generated files come with a generation warning and automatically converts .e
 The keyword **prefix** works similar to namespaces in C++ but not quite the same. The prefix gets added to everything global and as well as all function calls and non-standard types. Add two colons :: at the start to avoid prefixes. Access **prefix** paths with ::. The transpiler then simply converts all **prefix** paths and all :: to two underscores __. This gives complete clarity where functions come from and becomes easy to read transpiled code. 
 
 #### Example - Using prefix
-##### EasyC
+##### AlloyC
 ```c
 static int add(int a, int b)
 {
@@ -305,7 +305,7 @@ int int_math__multiply(const int factor_a, const int factor_b)
 One of the more important aspects, makes all variables constant by default and negates it with **mut** (for mutable). Helps coders keep with const correctness, especially for pointers, while keeping the code easy to read. Does not affect struct members because that causes behavior a lot of people will not expect, so there it is better to instead be explicit with const. 
 
 #### Example - Constant arguments and const pointer (but not const pointer target)
-##### EasyC
+##### AlloyC
 ```c
 int normalize_to_range(int value, int low_boundary, int high_boundary)
 {
@@ -359,10 +359,10 @@ void set_to_zero_if_negative(int* const i_ptr)
 ```
 
 ### Automatic runtime pointer null check with keyword check
-Keyword **check** allows users to make and return **check** pointers (pronounced "chic pointers", as in cool pointers). Functions returning **check** pointers must return an actual variable that is **check**. It automatically adds runtime null checks to all uses of pointers with the keyword, where the null checks are done with a macro called EC__NULL__CHECK which can be overriden by including another definition from a file (the definition gets put at the top of files after all file includes). Allows testing to better catch cases where there was a promise of a pointer not being null, but it was anyway, and can finally be disabled for performance.
+Keyword **check** allows users to make and return **check** pointers (pronounced "chic pointers", as in cool pointers). Functions returning **check** pointers must return an actual variable that is **check**. It automatically adds runtime null checks to all uses of pointers with the keyword, where the null checks are done with a macro called ALC__NULL__CHECK which can be overriden by including another definition from a file (the definition gets put at the top of files after all file includes). Allows testing to better catch cases where there was a promise of a pointer not being null, but it was anyway, and can finally be disabled for performance.
 
 #### Example - Simple dereference check and guarantee of a function return
-##### EasyC
+##### AlloyC
 ```c
 float dereference_float(check float* f_ptr)
 {
@@ -379,10 +379,10 @@ check float* get_ratio()
 ```
 ##### Transpiled C
 ```c
-#ifndef EC__NULL__CHECK
+#ifndef ALC__NULL__CHECK
 #include <stdio.h>
 #include <stdlib.h>
-#define EC__NULL__CHECK(x) \
+#define ALC__NULL__CHECK(x) \
 do { \
     if ((x) == NULL) { \
         fprintf(stderr, "File %s - Line %d had illegal null pointer, now exiting...\n", __FILE__, __LINE__); \
@@ -393,7 +393,7 @@ do { \
 
 float dereference_float(const float* const f_ptr)
 {
-    EC__NULL__CHECK(f_ptr);
+    ALC__NULL__CHECK(f_ptr);
     return(*f_ptr);
 }
 
@@ -402,7 +402,7 @@ static float ratio = 0.4;
 const float* const get_ratio()
 {
     const float* const result = &ratio;
-    EC__NULL__CHECK(result);
+    ALC__NULL__CHECK(result);
     return result;
 }
 ```
@@ -411,7 +411,7 @@ const float* const get_ratio()
 Syntactic sugar to keep code short and clean with clear intent. 
 
 #### Example - Using typestruct
-##### EasyC
+##### AlloyC
 ```c
 typestruct Color
 {
@@ -435,7 +435,7 @@ typedef struct Color Color;
 For anyone experienced with C++, this is a poor man's constexpr. The keyword **indef** stands for "inline definition" and simply lets users write local compile-time values more locally to where they are used, with very easy to read names. This is purely a readability feature, but readable code is also code where bugs are easier to catch. The real definition this gets converted to gets the name of the function it exists in added to it, and provides a little bit of type safety for more clear and debugable behavior.
 
 #### Example Using indef
-##### EasyC
+##### AlloyC
 ```c
 void Color::set::white(check mut Color* col)
 {
@@ -450,7 +450,7 @@ void Color::set::white(check mut Color* col)
 #define Color__set__white__WHITE ((const Color){ .r = Color__set__white__MAX, .g = Color__set__white__MAX, .b = Color__set__white__MAX })
 void Color__set__white(Color* const col)
 {
-    EC__NULL__CHECK(col);
+    ALC__NULL__CHECK(col);
     (*col) = Color__set__white__WHITE;
 }
 ```
@@ -459,7 +459,7 @@ void Color__set__white(Color* const col)
 The keyword **typenum** allows users to create type-safe enums, which are basically just define statements which reduces safety of code as functions expecting an enum type can be given any integer or even an enum of the wrong type. With **typenum** you get your values wrapped in a struct and with helper macros. It also supports the internal type being anything, such as a one-byte char.
 
 #### Example - Using typenum
-##### EasyC
+##### AlloyC
 ```c
 typenum LogOption
 {
@@ -512,7 +512,7 @@ void Log(const char* const log, const LogOption logopt)
 }
 ```
 #### Example - Typenum with char as byte
-##### EasyC
+##### AlloyC
 ```c
 typenum(char) GraphicMode
 {
@@ -541,7 +541,7 @@ With the keyword **cleanpop** a degree of RAII and memory management is introduc
 - Variables may not be assigned values manually when initialized.  
 
 #### Example - Defining simple string struct used in examples
-##### EasyC
+##### AlloyC
 ```c
 typestruct String
 {
@@ -575,14 +575,14 @@ struct String
 typedef struct String String;
 void String__populate(String* const str)
 {
-    EC__NULL__CHECK(str);
+    ALC__NULL__CHECK(str);
     str->data = NULL;
     str->size = 0;
     str->capacity = 0;
 }
 void String__cleanup(String* const str)
 {
-    EC__NULL__CHECK(str);
+    ALC__NULL__CHECK(str);
     free(str->data);
     str->data = NULL;
     str->size = 0;
@@ -592,7 +592,7 @@ void String__set(String* const target, const char* const c_string);
 ```
 
 #### Example - Using cleanpop and showing good const correctness practice with const _view pointers 
-##### EasyC
+##### AlloyC
 ```c
 void foo()
 {
@@ -616,7 +616,7 @@ void foo()
 ```
 
 #### Example - Showcase of more complicated case where automatic cleanup helps
-##### EasyC
+##### AlloyC
 ```c
 void String::add(check mut String* target, check char* addition);
 void String::equals(check String* str1, check String* str2);
@@ -693,7 +693,7 @@ void bar()
 }
 ```
 #### Example - Support more initializers with cleanpop arguments
-##### EasyC
+##### AlloyC
 ```C
 void String::populate_with_1(check mut String* str, check char* c_string)
 {
@@ -723,8 +723,8 @@ void foofoo()
 ```C
 void String__populate_with_1(String* const str, const char* const c_string)
 {
-    EC__NULL__CHECK(str);
-    EC__NULL__CHECK(c_string);
+    ALC__NULL__CHECK(str);
+    ALC__NULL__CHECK(c_string);
     String__populate(str);
     String__set(str, c_string);
 }
@@ -754,7 +754,7 @@ void foofoo()
 }
 ```
 #### Example - Using the move operator
-##### EasyC
+##### AlloyC
 ```c
 String::move(check mut String* from, check mut String* to)
 {
@@ -782,8 +782,8 @@ void foobar()
 ```c
 String__move(String* const from, String* const to)
 {
-    EC__NULL__CHECK(from);
-    EC__NULL__CHECK(to);
+    ALC__NULL__CHECK(from);
+    ALC__NULL__CHECK(to);
     if (to == from)
     {
         return;
