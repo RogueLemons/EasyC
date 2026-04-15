@@ -13,6 +13,7 @@ C Compatibility:
 Provides:
     ic_byte
     IC_ALIGNAS
+    IC_ALIGNAS_TYPE
     IC_ALIGNOF
     IC_MALLOC_ARRAY
 
@@ -61,6 +62,8 @@ Alignment support
 
 #endif
 
+#define IC_ALIGNAS_TYPE(type) IC_ALIGNAS(IC_ALIGNOF(type))
+
 
 /*
 ===============================================================================
@@ -78,7 +81,7 @@ Safety rules:
 ===============================================================================
 */
 
-IC_HEADER_SAFE void* ic_inner_malloc_array_impl(const size_t count, const size_t elem_size)
+IC_HEADER_FUNC void* ic_inner_malloc_array_impl(const size_t count, const size_t elem_size)
 {
     if (count == 0 || elem_size == 0) {
         return NULL;

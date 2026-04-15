@@ -149,7 +149,7 @@ It exists because C does not provide a consistent, cross-compiler mechanism for 
 IC_STATIC_ASSERT(sizeof(int) == 4, "int must be 4 bytes");
 ```
 
-##### Expansion
+##### Conceptual Expansion
 ```c
 // e.g. this for modern compilers
 static_assert(sizeof(int) == 4, "int must be 4 bytes");
@@ -213,7 +213,7 @@ if (Status_eq(s, Status_Error)) {
 const char* msg = Status_to_string(s);
 ```
 
-#### Expansion
+#### Conceptual Expansion
 ```c
 typedef struct {
     int Status_value;
@@ -303,7 +303,7 @@ if (color_get_red(&c) > 50)
 }
 ```
 
-##### Expansion
+##### Conceptual Expansion
 `IC_OPAQUE_STORAGE(Color, COLOR_ALIGN, COLOR_SIZE)` expands to:
 
 ```c
@@ -362,7 +362,7 @@ int main() {
 }
 ```
 
-##### Expansion
+##### Conceptual Expansion
 `IC_RESULT_TYPE(CharResult, char, int)` expands to:
 
 ```c
@@ -381,6 +381,91 @@ IC_HEADER_FUNC CharResult CharResult_ok(char v) {
 IC_HEADER_FUNC CharResult CharResult_err(int e) {
     return (CharResult){ .ok = 0, .data.error = e };
 }
+```
+
+### ic_memory.h
+A tiny, portable memory and alignment abstraction layer for C.
+
+It provides:
+- `ic_byte` as a simple byte type
+- `IC_ALIGNAS` for explicit alignment and `IC_ALIGNAS_TYPE` for alignment of a type
+- `IC_ALIGNOF` for querying alignment
+- `IC_MALLOC_ARRAY` for array allocation with early bad-argument catching
+
+It supports C89+ with fallbacks, while taking advantage of C11 features when available, and works across MSVC, GCC, and Clang. *Note: Alignment is not the easiest problem to manage and different compilers might handle exact usage differently (a portability limitation that must be accepted if using this).*
+
+`IC_MALLOC_ARRAY` catches negative arguments and integer overflow early and returns null. In worst fallback `IC_ALIGNAS` expands to nothing and `IC_ALIGNOF` uses `offsetof`. `ic_byte` is just an `unsigned char` but it helps with code clarity.
+
+#### Why use this?
+It exists because memory allocation and alignment handling in C are error-prone and inconsistent across compilers and standards. This abstraction makes it possible to safely allocate arrays without risking integer overflow and to write portable alignment-aware code. This results in fewer memory-related bugs, safer allocations, and improved cross-platform reliability.
+
+#### Example
+
+##### Usage
+```c
+#include "ic_memory.h" 
+#include <stddef.h>
+#include <stdlib.h>
+
+void foo()
+{
+   const size_t n = 10;
+   ic_byte* const buffer = IC_MALLOC_ARRAY(ic_byte, n)
+   if (buffer == NULL)
+   {
+        return;
+   }
+
+   // Do stuff
+   free(buffer);
+}
+
+typedef struct {
+    float e[8];
+} Matrix2x4;
+
+typedef struct {
+    IC_ALIGNAS_TYPE(Matrix2x4) float e[4];
+} Vec4;
+
+static const size_t Vec4Align = IC_ALIGNOF(Vec4);
+```
+
+##### Conceptual Expansion
+```c
+static inline void* ic_inner_malloc_array_impl(size_t count, size_t elem_size)
+{
+    if (count == 0 || elem_size == 0) return NULL;
+    if (count > ((size_t)-1) / elem_size) return NULL;
+    return malloc(count * elem_size);
+}
+
+void foo()
+{
+    const size_t n = 10;
+    ic_byte* const buffer = (ic_byte*)ic_inner_malloc_array_impl(
+        (n <= 0) ? 0u : (size_t)n,
+        sizeof(ic_byte)
+    );
+    if (buffer == NULL) return;
+
+    // Do stuff
+    free(buffer);
+}
+
+typedef struct {
+    float e[8];
+} Matrix2x4;
+
+typedef struct {
+    // with alignment
+    _Alignas(_Alignof(Matrix2x4)) float x, y, z, w;
+    //or no alignment for fallback
+    float x, y, z, w;
+} Vec4;
+typedef struct Vec4 Vec4;
+static const size_t Vec4Align = _Alignof(Vec4);
+
 ```
 
 ### Create a standardized, type-safe error system
