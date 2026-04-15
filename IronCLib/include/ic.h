@@ -1,10 +1,14 @@
 #ifndef IRON_C_FULL_H
 #define IRON_C_FULL_H
 
-#include "ic_static_assert.h"
+// No internal ic dependencies
 #include "ic_inline.h"
+#include "ic_static_assert.h"
+#include "ic_bounded_while.h"
+// Internally dependent on the above (no circular dependencies)
 #include "ic_typenum.h"
-#include "ic_opaque_storage.h"
 #include "ic_result.h"
+#include "ic_memory.h"
+#include "ic_opaque_storage.h"
 
 #endif // IRON_C_FULL_H
