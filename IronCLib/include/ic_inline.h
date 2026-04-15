@@ -73,4 +73,4 @@ Preferred for:
     #define IC_HEADER_FUNC static
 #endif
 
-#endif
+#endif // IC_INLINE_H

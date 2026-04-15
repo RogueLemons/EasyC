@@ -123,4 +123,4 @@ FULL COMPOSITE MACRO (recommended entry point)
     IC_TYPENUM_GENERATE_CONSTS(Type, LIST)
 
 
-#endif
+#endif // IC_TYPENUM_H

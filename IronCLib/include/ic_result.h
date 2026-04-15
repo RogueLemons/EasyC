@@ -112,4 +112,4 @@ This macro generates:
     } while (0)
 
 
-#endif
+#endif // IC_RESULT_H

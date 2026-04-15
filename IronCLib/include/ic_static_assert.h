@@ -43,4 +43,4 @@ For compilers without native static assert support, this will cause a compile-ti
 
 #endif
 
-#endif
+#endif // IC_STATIC_ASSERT_H

@@ -75,33 +75,7 @@ IMPORTANT RULES
 
 #include <stddef.h>
 #include "ic_static_assert.h"
-
-/* Basic byte type */
-typedef unsigned char ic_byte;
-
-
-/*
-===============================================================================
-Alignment support
-===============================================================================
-*/
-
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-    #define IC_ALIGNAS(x) _Alignas(x)
-    #define IC_ALIGNOF(x) _Alignof(x)
-
-#elif defined(_MSC_VER)
-    #define IC_ALIGNAS(x) __declspec(align(x))
-    #define IC_ALIGNOF(x) __alignof(x)
-
-#elif defined(__GNUC__) || defined(__clang__)
-    #define IC_ALIGNAS(x) __attribute__((aligned(x)))
-    #define IC_ALIGNOF(x) __alignof__(x)
-
-#else
-    #define IC_ALIGNAS(x)
-    #define IC_ALIGNOF(x) (offsetof(struct { char c; x member; }, member))
-#endif
+#include "ic_memory.h"
 
 
 /*
@@ -150,4 +124,4 @@ Definition check (for .c files)
 
 #endif
 
-#endif
+#endif // IC_OPAQUE_STORAGE_H

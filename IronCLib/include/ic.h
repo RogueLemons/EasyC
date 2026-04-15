@@ -4,7 +4,7 @@
 // No internal ic dependencies
 #include "ic_inline.h"
 #include "ic_static_assert.h"
-#include "ic_bounded_while.h"
+#include "ic_bounded_loop.h"
 // Internally dependent on the above (no circular dependencies)
 #include "ic_typenum.h"
 #include "ic_result.h"
