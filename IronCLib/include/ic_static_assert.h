@@ -17,10 +17,6 @@ For compilers without native static assert support, this will cause a compile-ti
 ===============================================================================
 */
 
-// glue helpers
-#define IC_INTERNAL_SA_GLUE(a,b) a##b
-#define IC_INTERNAL_SA_XGLUE(a,b) IC_INTERNAL_SA_GLUE(a,b)
-
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 
     #define IC_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
@@ -38,7 +34,7 @@ For compilers without native static assert support, this will cause a compile-ti
     #endif
 
     #define IC_STATIC_ASSERT(cond, msg) \
-        typedef char IC_INTERNAL_SA_XGLUE(static_assert_failed_, IC_INTERNAL_SA_UNIQUE_ID) \
+        typedef char IC_GLUE(static_assert_failed_, IC_INTERNAL_SA_UNIQUE_ID) \
         [(cond) ? 1 : -1]
 
 #endif

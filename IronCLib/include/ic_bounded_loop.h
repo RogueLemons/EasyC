@@ -25,6 +25,7 @@ Purpose:
 ===============================================================================
 */
 
+#include "ic_glue_macro.h"
 #include <stddef.h>
 
 /*
@@ -59,16 +60,14 @@ Example:
     }
 -------------------------------------------------------------------------------
 */
-#define IC_CONCAT_IMPL(a, b) a##b
-#define IC_CONCAT(a, b) IC_CONCAT_IMPL(a, b)
 
 #define IC_BOUNDED_WHILE(condition, max_loops)                              \
-    for (size_t IC_CONCAT(_ic_loop_, __LINE__) = 0,                         \
-                IC_CONCAT(_ic_max_, __LINE__) =                             \
+    for (size_t IC_GLUE(_ic_loop_, __LINE__) = 0,                         \
+                IC_GLUE(_ic_max_, __LINE__) =                             \
                     ((max_loops) <= 0) ? 0u : (size_t)(max_loops);          \
-         (IC_CONCAT(_ic_loop_, __LINE__) < IC_CONCAT(_ic_max_, __LINE__))   \
+         (IC_GLUE(_ic_loop_, __LINE__) < IC_GLUE(_ic_max_, __LINE__))   \
          && (condition);                                                    \
-         ++IC_CONCAT(_ic_loop_, __LINE__))
+         ++IC_GLUE(_ic_loop_, __LINE__))
 
 /*
 -------------------------------------------------------------------------------
@@ -104,15 +103,15 @@ Example:
 -------------------------------------------------------------------------------
 */
 #define IC_BOUNDED_DO_WHILE(condition, max_loops)                           \
-    for (size_t IC_CONCAT(_ic_loop_, __LINE__) = 0,                         \
-                IC_CONCAT(_ic_max_, __LINE__) =                             \
+    for (size_t IC_GLUE(_ic_loop_, __LINE__) = 0,                         \
+                IC_GLUE(_ic_max_, __LINE__) =                             \
                     ((max_loops) <= 0) ? 0u : (size_t)(max_loops),          \
-                IC_CONCAT(_ic_first_, __LINE__) = 1;                        \
-         IC_CONCAT(_ic_first_, __LINE__) ||                                 \
-         ((IC_CONCAT(_ic_loop_, __LINE__) < IC_CONCAT(_ic_max_, __LINE__))  \
+                IC_GLUE(_ic_first_, __LINE__) = 1;                        \
+         IC_GLUE(_ic_first_, __LINE__) ||                                 \
+         ((IC_GLUE(_ic_loop_, __LINE__) < IC_GLUE(_ic_max_, __LINE__))  \
           && (condition));                                                  \
-         IC_CONCAT(_ic_first_, __LINE__) = 0,                               \
-         ++IC_CONCAT(_ic_loop_, __LINE__))
+         IC_GLUE(_ic_first_, __LINE__) = 0,                               \
+         ++IC_GLUE(_ic_loop_, __LINE__))
 
          
 /*
