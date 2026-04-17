@@ -504,6 +504,11 @@ for (size_t loop = 0, max = 1000; (loop < max) && (x != NULL); ++loop)
 ### Create a standardized, type-safe error system
 The following will provide an example, showing how to use this library to create a standardized error system, working like an exception-as-return-value system, with one standardized error type for the whole application. 
 
+#### Why use this?
+C has no consistent error handling model, which leads to mixed return codes, null checks, and implicit failure states that are easy to miss and hard to maintain. This system replaces that with a single, type-safe error model where all functions return explicit result types and all errors come from one centralized typenum. This makes failures visible in the type system, consistent across the codebase, and easy to extend without breaking existing code.
+
+It turns error handling into explicit program structure, improving readability, reducing hidden bugs, and making control flow predictable and uniform.
+
 #### my_app_result.h
 Create your header where all errors shall be defined. Whenever you want to add more errors (or your Java mind wants more exceptions) then this is the file you edit. With uint16_t you can define 65536 different errors or with uint8_t 256. 
 
@@ -617,11 +622,182 @@ SwordResult make_sword(Resources* resources)
 }
 ```
 
+### Create one entrypoint for memory allocation
+The library has given a safer memory allocator with the wrapper `IC_MALLOC_ARRAY`, and by simply using this the risk of bugs will decrease, yet it can be taken a step further. The following demonstrates how to centralize all dynamic memory operations behind a single, type-safe interface. This creates a consistent allocation model across the entire codebase, reducing misuse and making memory behavior explicit and enforceable.
+
+#### Why use this?
+
+In raw C, memory allocation is, implicit (malloc vs calloc vs realloc), inconsistent (different argument rules), and easy to misuse (wrong sizes, missing overflow checks, invalid realloc usage). This structure makes allocation validated, consistent by centralization, and extensible.
+
+#### my_app_memory
+This section shows how to set up a centralized dynamic memory allocator with argument safety. The purpose is to never use malloc, calloc, or realloc directly after this, giving the system full control of memory usage. *Note: The source file creates real enums in order to switch-case the input. Use only when performance is critical since it removes part of the type-safety of the typenum.*
+
+##### my_app_memory.h
+```c
+#include "ic_typenum.h"
+
+#define ALLOC_MODE_LIST(X, Type) \
+    X(Type, Standard, 0, "Standard allocation") \
+    X(Type, Zeroed, 1, "Zero-initialized allocation") \
+    X(Type, Realloc, 2, "Reallocate existing memory")
+
+IC_TYPENUM_FULL(AllocMode, int, ALLOC_MODE_LIST)
+
+void* allocate_memory(const long element_size, const long element_count, const AllocMode mode, void* old_ptr);
+void free_memory(void* const ptr);
+```
+
+##### my_app_memory.c
+```c
+#include "ic_static_assert.h"
+#include "ic_glue_macro.h"
+#include <stdlib.h>
+
+#define ALLOC_MODE_INTERNAL_VALUES(Type, Name, Value, Str) IC_GLUE3(Type, _, Name) = Value,
+enum {
+    ALLOC_MODE_LIST(ALLOC_MODE_INTERNAL_VALUES, AllocModeVal)
+};
+
+void* allocate_memory(const long element_size, const long element_count, const AllocMode mode, void* old_ptr)
+{
+    if (element_size <= 0 || element_count <= 0) // validate input
+    {
+        return NULL;
+    }
+    const size_t size  = (size_t)element_size;
+    const size_t count = (size_t)element_count;
+    if (count > ((size_t)-1) / size) // overflow guard
+    {
+        return NULL;
+    }
+    const size_t total_size = size * count;
+
+    switch (AllocMode_get(mode))
+    {
+        case AllocModeVal_Standard:
+            if (old_ptr != NULL) { return NULL; }
+            return malloc(total_size);
+        case AllocModeVal_Zeroed:
+            if (old_ptr != NULL) { return NULL; }
+            return calloc(count, size);
+        case AllocModeVal_Realloc:
+            if (old_ptr == NULL) { return NULL; }
+            return realloc(old_ptr, total_size);
+        default:
+            return NULL;
+    }
+
+    return NULL;
+}
+
+void free_memory(void* const ptr)
+{
+    if (ptr == NULL) { return; }
+    free(ptr);
+}
+```
+
+##### Usage
+```c
+int* int_list = allocate_memory(sizeof(int), 5, AllocMode_Standard, 0);
+```
+
+#### Expand it
+With a centralized memory allocator in place, let's begin expanding it. 
+
+##### my_app_memory.h
+Ease-of-use macros can be added. *Note: Adding these macros can make it harder to scan the code for all memory allocations.*
+
+```c
+#define alloc_mem(count, type) allocate_memory(sizeof(type), count, AllocMode_Standard, 0)
+#define alloc_zeroed_mem(count, type) allocate_memory(sizeof(type), count, AllocMode_Zeroed, 0)
+#define realloc_mem(old_ptr, count, type) allocate_memory(sizeof(type), count, AllocMode_Realloc, old_ptr)
+```
+
+##### Macro Usage
+```c
+int* int_list = alloc_mem(5, int);
+```
+
+##### my_app_memory.c
+After this the core function can be expanded to include debugging features, such as logging and memory leak tracking. 
+
+```c
+// <function code>
+    switch (AllocMode_get(mode))
+    {
+        case AllocModeVal_Standard:
+            if (old_ptr != NULL) 
+            {
+                LOG("[MemAlloc][Standard] Illegal old_ptr value"); 
+                return NULL; 
+            }
+            void* res = malloc(total_size);
+            if (res == NULL)
+            {
+                LOG("[MemAlloc][Standard] Failed to allocate memory");
+            }
+            else 
+            {
+                track(res, total_size);
+            }
+            return res;
+    
+    // <other cases>
+    }
+// <function code>
+
+void free_memory(void* const ptr)
+{
+    if (ptr == NULL) 
+    {
+        LOG("[FreeMem] NULL pointer, no op");
+        return; 
+    }
+    free(ptr);
+    untrack(ptr);
+}
+```
+
+Self-implemented memory allocators can also be used instead, such as an allocator using a memory pool on the stack, and they can be added or removed at any time in the project for project-wide improvement. *Note: Implementing this system can make it worthwhile to use "simple" struct forward declarations instead of using opaque storage.*
+
+```c
+void* allocate_memory(const long element_size, const long element_count, const AllocMode mode, void* old_ptr)
+{
+    // <function code>
+    void* res = try_stack_pool_memory_allocate_first(element_size, element_count, mode);
+    // <function code>
+}
+```
+
+##### my_app_result.h
+Go further and return a result type. Building off of the previous section, [Create a standardized, type-safe error system](#create-a-standardized-type-safe-error-system), it becomes as easy as adding a few extra error types and editing the result type of the memory allocator function.
+
+```c
+#define MY_APP_ERROR_LIST(X, Type) \
+    X(Type, NoError, 0, "Everything is fine") \
+    X(Type, Runtime, 1, "Something went wrong") \
+    X(Type, Argument, 2, "Illegal argument was provided") \
+    X(Type, NullRef, 3, "Illegal null pointer was provided") \
+    X(Type, Permission, 4, "Failure due to lacking permissions") \
+    X(Type, BadAlloc, 5, "Failed to allocate memory")
+
+// Later in file
+typedef void* VoidPtr;
+MY_APP_RESULT_TYPE(VoidPtr)
+```
+
+##### my_app_memory.h
+```c
+#include "my_app_result.h"
+
+VoidPtrResult allocate_memory(const long element_size, const long element_count, const AllocMode mode, void* old_ptr);
+VoidResult free_memory(void* const ptr); // If using own allocator, implementation could give fail result
+```
 
 # TODO
 
 ## Lib
-- Make header with one bind/concat/glue macro to use for all other headers
 - Add IC_TYPENUM_FULL_HEADER and IC_TYPENUM_FULL_SOURCE macros that allow users to static const and static inline in their header or function defintions and extern varibles
 - Consider adding a macro tag for IC_TYPENUM that converts everything to a simple typedef of the inner type
 - Add optional system to opaque storage that can be turned on and off with a macro tag, that includes IC_OPAQUE_LOAD and IC_OPAQUE_STORE that handles aliasing safety through hard-copying internal bytes, but will without the tag just to fast pointer casting
