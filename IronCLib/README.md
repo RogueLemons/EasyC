@@ -761,7 +761,7 @@ void free_memory(void* const ptr)
 }
 ```
 
-Self-implemented memory allocators can also be used instead, such as an allocator using a memory pool on the stack, and they can be added or removed at any time in the project for project-wide improvement. *Note: Implementing this system can make it worthwhile to use "simple" struct forward declarations instead of using opaque storage.*
+Self-implemented memory allocators can also be used instead, such as an allocator using a memory pool on the stack, and they can be added or removed at any time in the project for project-wide improvement. *Note: A stack based allocator can make it worthwhile to use "simple" struct forward declarations instead of using opaque storage.*
 
 ```c
 void* allocate_memory(const long element_size, const long element_count, const AllocMode mode, void* old_ptr)
