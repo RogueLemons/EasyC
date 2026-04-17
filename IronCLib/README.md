@@ -630,7 +630,7 @@ The library has given a safer memory allocator with the wrapper `IC_MALLOC_ARRAY
 In raw C, memory allocation is, implicit (malloc vs calloc vs realloc), inconsistent (different argument rules), and easy to misuse (wrong sizes, missing overflow checks, invalid realloc usage). This structure makes allocation validated, consistent by centralization, and extensible.
 
 #### my_app_memory
-This section shows how to set up a centralized dynamic memory allocator with argument safety. The purpose is to never use malloc, calloc, or realloc directly after this, giving the system full control of memory usage. *Note: The source file creates real enums in order to switch-case the input. Use only when performance is critical since it removes part of the type-safety of the typenum.*
+This section shows how to set up a centralized dynamic memory allocator with argument safety. The purpose is to never use malloc, calloc, or realloc directly after this, giving the system full control of memory usage.
 
 ##### my_app_memory.h
 ```c
@@ -696,6 +696,8 @@ void free_memory(void* const ptr)
     free(ptr);
 }
 ```
+
+*Note: The source file creates real enums in order to switch-case the input. Use only when performance is critical since it removes part of the type-safety of the typenum.*
 
 ##### Usage
 ```c
@@ -795,6 +797,8 @@ VoidPtrResult allocate_memory(const long element_size, const long element_count,
 VoidResult free_memory(void* const ptr); // If using own allocator, implementation could give fail result
 ```
 
+### Write with rules for structs and opaque storage
+
 # TODO
 
 ## Lib
@@ -808,10 +812,10 @@ VoidResult free_memory(void* const ptr); // If using own allocator, implementati
 - For SteelCLib add VoidResult macros
 - For SteelCLib, only care about C99 and forward, and add bounded for loop
 - Add memory alloc and span helpers? Add easy and safe zero init?
-- Make typenum generated functions use pointers?
+- Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
 - Add tests that can be verified on multiple compilers
-- Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser WorkshopC because it helps create strong-like-metal C
-- Add example and guidance for creating a strong system linking together IronC result types, typenums, and structs. 
+- Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser WorkshopC because it helps create strong-like-metal C 
+- Add IronHammerC testing system
 
 ## Parser
 Parser must be implemented to transfer goals of EasyCTranspiler into a warning/suggestion system for pure C code. The name shall be WorkshopC.
