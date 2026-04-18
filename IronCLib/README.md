@@ -9,7 +9,7 @@ Includes:
 - Type-safe enum replacement (`ic_typenum.h`)
 - Opaque struct storage for encapsulation (`ic_opaque_storage.h`)
 - Result-based error handling (`ic_result.h`)
-- Memory allocation abstraction layer (`ic_memory.h`)
+- Memory allocation safety checks (`ic_memory.h`)
 - Bounded loop safety utilities (`ic_bounded_loop.h`)
 
 ## Table of Contents
@@ -85,7 +85,7 @@ struct Matrix4x4Impl {
     float data[16];
 };
 typedef struct Matrix4x4Impl Matrix4x4Impl;
-IC_OPAQUE_IMPL_ASSERT(Matrix4x4, MAT4_ALIGN, MAT4_SIZE)
+IC_OPAQUE_IMPL_ASSERT(Matrix4x4Impl, MAT4_ALIGN, MAT4_SIZE)
 
 void mat4_set_identity(Matrix4x4* const m) {
     Matrix4x4Impl* const real = (Matrix4x4Impl*)m;
@@ -255,7 +255,7 @@ It provides:
 - Compile-time size and alignment validation
 - Separation of interface and implementation
 
-Expects you to define a fixed `size` and `alignment` for the type. You create it with `IC_OPAQUE_STORAGE(Type, ALIGNMENT, SIZE)` in the header and `IC_OPAQUE_IMPL_ASSERT(Type, ALIGNMENT, SIZE)` in the source.
+Expects you to define a fixed `size` and `alignment` for the type. You create it with `IC_OPAQUE_STORAGE(Type, ALIGNMENT, SIZE)` in the header and `IC_OPAQUE_IMPL_ASSERT(TypeImpl, ALIGNMENT, SIZE)` in the source.
 
 #### Why use this?
 It exists because C struct layouts are normally exposed in headers, tightly coupling users to internal representation and preventing safe evolution of implementation. This abstraction makes it possible to hide internal structure while still allowing stack allocation and enforcing size and alignment constraints. This results in true encapsulation, ABI-safe design, and fully controlled internal state.
@@ -284,7 +284,7 @@ struct ColorImpl {
 };
 typedef struct ColorImpl ColorImpl;
 
-IC_OPAQUE_IMPL_ASSERT(Color, COLOR_ALIGN, COLOR_SIZE)
+IC_OPAQUE_IMPL_ASSERT(ColorImpl, COLOR_ALIGN, COLOR_SIZE)
 
 void color_init(Color* c, int r, int g, int b) {
     ColorImpl* real = (ColorImpl*)c;
@@ -825,6 +825,7 @@ VoidResult free_memory(void* const ptr); // If using own allocator, implementati
 - Add tests that can be verified on multiple compilers
 - Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser WorkshopC because it helps create strong-like-metal C 
 - Add IronHammerC testing system
+- Update IC_OPAQUE_IMPL_ASSERT signature to just take api struct and impl struct as arguments
 
 ## Parser
 Parser must be implemented to transfer goals of EasyCTranspiler into a warning/suggestion system for pure C code. The name shall be WorkshopC.
