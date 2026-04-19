@@ -83,7 +83,7 @@ To-string support (switch-based, user-defined strings)
 ===============================================================================
 */
 
-#define IC_TYPENUM_TO_STRING_CASE(Type, name, value, str) \
+#define IC_INNER_TYPENUM_TO_STRING_CASE(Type, name, value, str) \
     case value: return str;
 
 
@@ -91,7 +91,7 @@ To-string support (switch-based, user-defined strings)
     IC_HEADER_FUNC const char* IC_GLUE(Type, _to_string)(const Type v) \
     { \
         switch (IC_GLUE(Type, _get)(v)) { \
-            LIST(IC_TYPENUM_TO_STRING_CASE, Type) \
+            LIST(IC_INNER_TYPENUM_TO_STRING_CASE, Type) \
             default: return "Unknown " #Type; \
         } \
     }
@@ -103,12 +103,12 @@ Constant generation (typed named values)
 ===============================================================================
 */
 
-#define IC_TYPENUM_CONST(Type, name, value, str) \
+#define IC_INNER_TYPENUM_CONST(Type, name, value, str) \
     static const Type IC_GLUE3(Type, _, name) = { value };
 
 
 #define IC_TYPENUM_GENERATE_CONSTS(Type, LIST) \
-    LIST(IC_TYPENUM_CONST, Type)
+    LIST(IC_INNER_TYPENUM_CONST, Type)
 
 
 /*
