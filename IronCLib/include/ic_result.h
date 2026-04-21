@@ -96,18 +96,17 @@ This macro generates:
 
 
 /*==============================================================================
-  TRY PROPAGATION WITH TYPE SAFETY CHECK
+  TRY PROPAGATION
 
 - early return on error
 - zero runtime overhead in optimized builds
 
 ==============================================================================*/
 
-#define IC_TRY_RETURN_ERR_AS(type, result) \
+#define IC_TRY_RETURN_ERR_AS(return_type, result) \
     do { \
-        type const ic_try_res = (result); \
-        if (!ic_try_res.ok) { \
-            return type##_err(ic_try_res.data.error); \
+        if (!result.ok) { \
+            return return_type##_err(result.data.error); \
         } \
     } while (0)
 

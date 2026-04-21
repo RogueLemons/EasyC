@@ -813,7 +813,153 @@ VoidResult free_memory(void* const ptr); // If using own allocator, implementati
 ```
 
 ### Write with rules for structs and opaque storage
-(in progress)
+> “With great power comes great responsibility.”
+>
+> — Uncle Ben, original quote written by Stan Lee in Spider-Man
+
+Computers do exactly what they are told, not what is wanted. Why do some coders say to always initialize variables? In this example, unitialized data gets sent into the function and the result is not deterministic.
+
+```c
+typedef struct {
+    int a;
+    int b;
+    int c;
+} AdvancedFunctionArguments;
+int AdvancedFunction(AdvancedFunctionArguments* args);
+
+void foo()
+{
+    AdvancedFunctionArguments args;
+    // Easier to debug with AdvancedFunctionArguments args = {0}; 
+    args.a = 3;
+    args.b = 7;
+    // args.c not initialized
+    const int res = AdvancedFunction(&args);
+}
+```
+
+For a function with arguments like this, the coders must make sure no mistakes are made any time the function is used instead of putting more work on the function definition in one place. `int AdvFunc(int a, int b, int c)` will not compile for `AdvFunc(3, 7)`. This does not mean coders should be forbidden from using structs for arguments, just to be mindful of what is being done.
+
+This section will focus on making headers easier to read with opaque storage, and provide a simple ruleset that can be followed to give clear direction in the code base. 
+
+#### Why use this?
+With clear naming conventions and with headers that do not give complete access to data being passed by default, it becomes easier to avoid user errors. 
+
+#### Standardize project's initializers
+Introduce project policies: a) all structs shall be immediately initialized, and b) they shall be cleaned up at all scope exits. Decide on the naming convention `struct_init` and `struct_cleanup`. Formalize that all getters and setters shall include this in the name. Make sure to properly apply const correctness within functions and begin non-const arguments with `out_`. This creates a solid base to provide a lot more clarity in the project.
+
+The following provides an example of what this might look like.
+
+##### my_string.h
+```c
+#include "ic_opaque_storage.h"
+
+#define STRING_SIZE   (24)
+#define STRING_ALIGN  (8)
+IC_OPAQUE_STORAGE(String, STRING_ALIGN, STRING_SIZE)
+
+void string_init(String* const out_string);
+void string_init_with(String* const out_string);
+void string_cleanup(String* const out_string);
+
+void string_set(String* const out_string, const char* const c_str); 
+void string_add(String* const out_string, const String* const other_string); 
+void string_add_chars(String* const out_string, const char* const c_str) 
+const char* string_get_data(const String* const s); 
+size_t string_get_size(const String* const s); 
+size_t string_get_capacity(const String* const s);
+```
+
+##### Usage
+```c
+void foo()
+{
+    string str;
+    string_init_with(&str, "Hello there!");
+
+    printf("String data: %s\n", string_get_data(&str));
+    printf("String size: %zu\n", string_get_size(&str));
+    printf("String capacity: %zu\n", string_get_capacity(&str));
+
+    string_cleanup(&str);
+}
+```
+
+#### Naming conventions to consider
+This section does not exist as some divine source of wisdom. It only provides suggestions to consider. As such, the naming convention can be expanded.
+
+- `struct_populate` can be used side-by-side with `struct_init` as a way of saying the struct does not require cleanup and is only containing simple data.
+- `struct_cleanup` can be an empty macro definition, and a rule to always have it accompanied, can be implemented so that if a cleanup function is later implemented there is no need to edit code anywhere.
+- The argument prefix `out_` can be specified to only apply to initialization, and the prefixes `mut_` (or `mod_`) and `mov_` can be implemented to show clear intent about modifiying or transfering ownership. This way the function signatures provide expectations.
+- `new` and `make` can also be used for initializers with `delete` as the cleanup function, or `construct` and `destruct`, where these initializers could return the struct instead of taking one as a reference.
+
+#### Merge with result types
+The above example does not return success values or failure results. It could be done by returning integers, or the result system can be expanded. This builds on top of the previously discussed project wide result system. Anytime a new result type based on a struct is added it should be next to the struct definition in the header. 
+
+If a combined system is desired then a common solution is to use goto statements for cleanup, and single exit of scope. Although it is possible to build macros that will manage cleanup and early return on error, there is a strong risk it leads to macro-hell and effectively becomes a macro-language instead of intentional C code.
+
+##### my_result_string.h 
+```c
+#include "ic_opaque_storage.h"
+#include "my_app_result.h"
+
+#define STRING_SIZE   (24)
+#define STRING_ALIGN  (8)
+IC_OPAQUE_STORAGE(String, STRING_ALIGN, STRING_SIZE)
+MY_APP_RESULT_TYPE(String)                              // Create string result
+
+StringResult construct_string(const char* const c_str); // Return string result
+void destruct_string(String* const mut_str);            // Destructor does not return anything
+
+VoidResult string_set(String* const out_string, const char* const c_str); 
+VoidResult string_add(String* const out_string, const String* const other_string); 
+VoidResult string_add_chars(String* const out_string, const char* const c_str);
+// Assuming following result types exist in my_app_result.h
+StringViewResult string_get_data(const String* const s);
+SizeResult string_get_size(const String* const s); 
+SizeResult string_get_capacity(const String* const s);
+```
+
+##### Usage
+```c
+// Macro shall exist at high level file, e.g. the generic result types file.
+// This macro introduces three rules:
+//      1) The arg r must be a variable so it is not evaluated multiple times
+//      2) To use this the function must create a result variable at start
+//      3) To use this the function must end with a cleanup goto tag
+#define try(r) do {                         \
+    if (!(r).ok) {                          \
+        result.ok = 0;                      \
+        result.data.error = (r).data.error; \
+        goto cleanup;                       \
+    }                                       \
+} while (0)
+
+VoidResult foo()
+{
+    VoidResult result = Result_err(Error_Runtime);
+
+    StringResult str = construct_string("Hello again");
+    try(str);
+
+    const StringViewResult c_str = string_get_data(&str);
+    try(c_str);
+    printf("String data: %s\n", valueof(c_str));
+
+    const SizeResult size = string_get_size(&str);
+    try(size);
+    printf("String size: %zu\n", valueof(size));
+
+    const SizeResult cap = string_get_capacity(&str);
+    try(cap);
+    printf("String capacity: %zu\n", valueof(cap));
+
+    result = Result_ok;
+cleanup:
+    destruct_string(&str);
+    return result;
+}
+```
 
 # TODO
 
@@ -832,7 +978,6 @@ VoidResult free_memory(void* const ptr); // If using own allocator, implementati
 - Add tests that can be verified on multiple compilers
 - Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser WorkshopC because it helps create strong-like-metal C 
 - Add IronHammerC testing system
-- Update IC_OPAQUE_IMPL_ASSERT signature to just take api struct and impl struct as arguments
 
 ## Parser
 Parser must be implemented to transfer goals of EasyCTranspiler into a warning/suggestion system for pure C code. The name shall be WorkshopC.
