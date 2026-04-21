@@ -37,8 +37,6 @@ Includes:
   * [Create one entrypoint for memory allocation](#create-one-entrypoint-for-memory-allocation)
   * [Write with rules for structs and opaque storage](#write-with-rules-for-structs-and-opaque-storage)
 * [TODO](#todo)
-  * [Library](#todo)
-  * [Parser](#todo)
 
 ## Quick Intro
 A fast showcase of how the library is used, before more in-depth descriptions and examples. 
