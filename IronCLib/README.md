@@ -103,20 +103,26 @@ float mat4_get(const Matrix4x4* const m, const int row, const int col) {
 ```
 
 ### Example 3
-This examples shows using a slightly safer memory allocator and bounded while loop. 
+This examples shows using a slightly safer memory allocator, bounded while loop, and usage of safer casting functions. 
 
 ```c
 #include "ic.h"
+#include <stdint.h>
+
+#define MY_CASTING_MATRIX(X) \
+    X(int32_t, IC_MOLD_SIGNED_INT, INT32_MIN, INT32_MAX, uint16_t, IC_MOLD_UNSIGNED_INT, 0, UINT16_MAX)
+    // Add more entries here
+IC_CASTING_FUNCTIONS(MY_CASTING_MATRIX)
 
 int main(void)
 {
-    int count = 10;
-    int* values = IC_MALLOC_ARRAY(int, count);
+    int32_t count = 10;
+    uint16_t* values = IC_MALLOC_ARRAY(uint16_t, count);
     if (!values) return 1;
 
-    int i = 0;
+    int32_t i = 0;
     IC_BOUNDED_WHILE(i < count, 1000) {
-        values[i] = 3;
+        values[i] = cast_int32_t_to_uint16_t(i);
         i++;
     }
 
