@@ -12,7 +12,7 @@ Includes:
 * Drop-in code generators
   * Type-safe enum replacement (`ic_typenum.h`)
   * Opaque struct storage for encapsulation (`ic_opaque_storage.h`)
-* Code generators set up once in one place
+* Monolithic code generators
   * Result-based error handling (`ic_result.h`)
   * Safer numeric casting function generators (`ic_num_cast.h`)
 
