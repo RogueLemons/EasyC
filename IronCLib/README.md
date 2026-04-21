@@ -1018,15 +1018,16 @@ SizeResult string_get_capacity(const String* const s);
 ```c
 // Macro shall exist at high level file, e.g. the generic result types file.
 // This macro introduces three rules:
-//      1) The arg r must be a variable so it is not evaluated multiple times
+//      1) The result and expression r must have same error type
 //      2) To use this the function must create a result variable at start
 //      3) To use this the function must end with a cleanup goto tag
-#define try(r) do {                         \
-    if (!(r).ok) {                          \
-        result.ok = 0;                      \
-        result.data.error = (r).data.error; \
-        goto cleanup;                       \
-    }                                       \
+#define try(type, r) do {                               \
+    type _ic_res_tmp = (r);                             \
+    if (!(_ic_res_tmp).ok) {                            \
+        result.ok = 0;                                  \
+        result.data.error = (_ic_res_tmp).data.error;   \
+        goto cleanup;                                   \
+    }                                                   \
 } while (0)
 
 VoidResult foo()
@@ -1034,18 +1035,18 @@ VoidResult foo()
     VoidResult result = Result_err(Error_Runtime);
 
     StringResult str = construct_string("Hello again");
-    try(str);
+    try(StringResult, str);
 
     const StringViewResult c_str = string_get_data(&str);
-    try(c_str);
+    try(StringViewResult, c_str);
     printf("String data: %s\n", valueof(c_str));
 
     const SizeResult size = string_get_size(&str);
-    try(size);
+    try(SizeResult, size);
     printf("String size: %zu\n", valueof(size));
 
     const SizeResult cap = string_get_capacity(&str);
-    try(cap);
+    try(SizeResult, cap);
     printf("String capacity: %zu\n", valueof(cap));
 
     result = Result_ok;
