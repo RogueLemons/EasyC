@@ -78,6 +78,7 @@ NOTES
 
 #include "ic_glue_macro.h"
 #include "ic_static_assert.h"
+#include "ic_inline.h"
 
 /*
 ===============================================================================
