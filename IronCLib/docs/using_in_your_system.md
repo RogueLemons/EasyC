@@ -1,6 +1,13 @@
 # Using in your system
 The following sections include topics for using IronCLib in a code base. This is a continuation of [the header library documentation](header_library.md).
 
+## Table of Contents
+* [Using in your system](#using-in-your-system)
+* [Create a standardized, type-safe error system](#create-a-standardized-type-safe-error-system)
+* [Create one entrypoint for memory allocation](#create-one-entrypoint-for-memory-allocation)
+* [Write with rules for structs and opaque storage](#write-with-rules-for-structs-and-opaque-storage)
+* [Make it your own](#make-it-your-own)
+
 ## Create a standardized, type-safe error system
 The following will provide an example, showing how to use this library to create a standardized error system, working like an exception-as-return-value system, with one standardized error type for the whole application. 
 
@@ -8,6 +15,9 @@ The following will provide an example, showing how to use this library to create
 C has no consistent error handling model, which leads to mixed return codes, null checks, and implicit failure states that are easy to miss and hard to maintain. This system replaces that with a single, type-safe error model where all functions return explicit result types and all errors come from one centralized typenum. This makes failures visible in the type system, consistent across the codebase, and easy to extend without breaking existing code.
 
 It turns error handling into explicit program structure, improving readability, reducing hidden bugs, and making control flow predictable and uniform.
+
+### Setup for you
+A header file full of global standard errors is [provided here](setup_for_you/global_error.h), and a header for creating the standard results with the global errors is [provided here](setup_for_you/global_result.h).
 
 ### my_app_result.h
 Create your header where all errors shall be defined. Whenever you want to add more errors (or your Java mind wants more exceptions) then this is the file you edit. With uint16_t you can define 65536 different errors or with uint8_t 256. 
@@ -448,4 +458,4 @@ cleanup:
 ```
 
 ## Make it your own
-(upcoming)
+(TODO)

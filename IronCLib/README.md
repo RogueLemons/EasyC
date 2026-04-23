@@ -1,144 +1,148 @@
 # IronCLib
-A small C library for writing safer, more consistent C code.
+A small, header-only C library for writing safer, more consistent C code. 
 
-It is a header-only utility library and a code analysis parser is planned for additional warnings and safety checks.
+Each utility is stand-alone and can be adopted without using the rest. IronCLib provides small, composable building blocks for safer, more consistent C code. Best-effort C89 compatibility, where reasonably practical.
 
 Includes:
-* Instant features
+* Ready-to-use utilities (use in your project right now)
   * Compile-time assertions (`ic_static_assert.h`)
   * Inline and header safety abstractions (`ic_inline.h`)
   * Memory allocation safety checks (`ic_memory.h`)
   * Bounded loop safety utilities (`ic_bounded_loop.h`)
-* Drop-in code generators
+* Code generation utilities (ad-hoc and monolithic)
   * Type-safe enum replacement (`ic_typenum.h`)
-  * Opaque struct storage for encapsulation (`ic_opaque_storage.h`)
-* Monolithic code generators
-  * Result-based error handling (`ic_result.h`)
   * Safer numeric casting function generators (`ic_num_cast.h`)
+  * Opaque struct storage for encapsulation (`ic_opaque_storage.h`)
+  * Result-based error handling (`ic_result.h`)
 
-## Table of Contents (TODO)
+## Table of Contents
 * [Overview](#ironclib)
 * [Quick Intro](#quick-intro)
-  * [Example 1](#example-1)
-  * [Example 2](#example-2)
-  * [Example 3](#example-3)
-* [Header Library](#header-library)
-  * [ic.h](#ich)
-  * [ic_static_assert.h](#ic_static_asserth)
-  * [ic_inline.h](#ic_inlineh)
-  * [ic_typenum.h](#ic_typenumh)
-  * [ic_opaque_storage.h](#ic_opaque_storageh)
-  * [ic_result.h](#ic_resulth)
-  * [ic_memory.h](#ic_memoryh)
-  * [ic_bounded_loop.h](#ic_bounded_looph)
-  * [ic_num_cast.h](#ic_num_casth)
-* [Using in your system](#using-in-your-system)
-  * [Create a standardized, type-safe error system](#create-a-standardized-type-safe-error-system)
-  * [Create one entrypoint for memory allocation](#create-one-entrypoint-for-memory-allocation)
-  * [Write with rules for structs and opaque storage](#write-with-rules-for-structs-and-opaque-storage)
+* [Read more?](#read-more)
 * [TODO](#todo)
 
 ## Quick Intro
-A fast showcase of how the library is used, before more in-depth descriptions and examples. 
+A fast showcase of how the library is used, before more in-depth descriptions and examples.
 
-### Example 1
-This example shows how you can combine a type-safe enum replacement with result types static assert in a header implemented function.
+### Ready-to-use utilities
+The following provides quick examples of the IronCLib parts that require no setup. 
+
+#### Compile-time assert
+Verify boolean expressions at compile-time.
 
 ```c
-#include "ic.h"
-#include <stdint.h>
+#include "ic_static_assert.h"
 
-#define MATH_ERROR_LIST(X, Type) \
-    X(Type, Generic, 0, "An error occurred") \
-    X(Type, DivideByZero, 1, "Division by zero") 
+IC_STATIC_ASSERT(sizeof(int) >= 4, "int must be 4 bytes or more");
+```
 
-IC_TYPENUM_FULL(MathError, uint8_t, MATH_ERROR_LIST)
-IC_RESULT_TYPE(IntResult, int, MathError)
+#### Inline and safe header functions
+Write functions safely in headers.
 
-IC_HEADER_FUNC IntResult safe_divide(int a, int b) {
-    IC_STATIC_ASSERT(sizeof(int) >= 4, "int too small");
+```c
+#include "ic_inline.h"
 
-    if (b == 0) {
-        return IntResult_err(Error_DivideByZero);
-    }
+IC_HEADER_FUNC int add(const int a, const int b) { return a+b; }
+```
 
-    return IntResult_ok(a / b);
+#### Memory allocation with safety checks
+Allocate memory on heap or return NULL for unsafe arguments.
+
+```c
+#include "ic_memory.h"
+
+int* ten_ints = IC_MALLOC_ARRAY(int, 10);
+```
+
+#### Bounded loops
+Write loops with a maximum number of iterations.
+
+```c
+#include "ic_bounded_loop.h"
+
+int res = 0;
+IC_BOUNDED_WHILE(0 == res, 1000) // max 1000 iterations
+{
+    res = foo();
 }
 ```
 
-### Example 2
-This example shows how to create opaque structs allocated on the stack, where users can only access struct implementation members via functions. *Note: This example does not conform with strict aliasing.*
+### Code generation utilities
+The following provides quick examples of how to generate code or use it.
+
+- Ad-hoc: defined where used
+- Monolithic: generated once per project
+
+#### Type-safe enums
+Ad-hoc: Quickly create a type-safe alternative to enums.
 
 ```c
-// ------- Matrix4x4.h -------
-#include "ic.h"
+#include "ic_typenum.h"
+
+#define USE_MODE_LIST(X, Type) \
+    X(Type, Quality, 0, "Usage optimized for quality") \
+    X(Type, Performance, 1, "Usage optimized for performance") \
+    X(Type, Battery, 2, "Usage optimized for battery duration") 
+IC_TYPENUM_FULL(UseMode, uint8_t, USE_MODE_LIST)
+
+void run_process(UseMode mode);
+```
+
+#### Numeric casting functions
+Monolithic: Avoid undefined behavior when casting by generating cast functions from a once-defined list. Pre-made header provided.
+
+```c
+#include "setup_for_you/numbers.h"
+
+i32 i = cast_f64_to_i32(9876.543);
+```
+
+#### Opaque storage
+Ad-hoc: Create opaque storage types quickly and with standardized method.
+
+```c
+// Header
+#include "ic_opaque_storage.h"
 
 #define MAT4_SIZE  (sizeof(float) * 16)
 #define MAT4_ALIGN (IC_ALIGNOF(float))
-IC_OPAQUE_STORAGE(Matrix4x4, MAT4_ALIGN, MAT4_SIZE)
+IC_OPAQUE_STORAGE(Matrix4x4, MAT4_ALIGN, MAT4_SIZE) // fixed-size opaque type
 
-// API
 void mat4_set_identity(Matrix4x4* const m);
 float mat4_get(const Matrix4x4* const m, const int row, const int col);
 
-// ------- Matrix4x4.c -------
-#include "Matrix4x4.h"
-
-struct Matrix4x4Impl {
+// Source
+typedef struct Matrix4x4Impl {
     float data[16];
-};
-typedef struct Matrix4x4Impl Matrix4x4Impl;
+} Matrix4x4Impl;
 IC_OPAQUE_IMPL_ASSERT(Matrix4x4Impl, MAT4_ALIGN, MAT4_SIZE)
-
-void mat4_set_identity(Matrix4x4* const m) {
-    Matrix4x4Impl* const real = (Matrix4x4Impl*)m;
-
-    for (int i = 0; i < 16; ++i)
-    {
-        real->data[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-    }
-}
-
-float mat4_get(const Matrix4x4* const m, const int row, const int col) {
-    const Matrix4x4Impl* const real = (const Matrix4x4Impl*)m;
-    return real->data[row * 4 + col];
-}
 ```
 
-### Example 3
-This examples shows using a slightly safer memory allocator, bounded while loop, and usage of safer casting functions. 
+#### Standardized result types
+Ad-hoc and monolithic: Quickly define result types (possibly based on global error type). Pre-made header provided.
 
 ```c
-#include "ic.h"
-#include <stdint.h>
+// Matrix4x4 header
+#include "setup_for_you/global_result.h"
 
-#define MY_CASTING_MATRIX(X) \
-    X(int32_t, IC_MOLD_SIGNED_INT, INT32_MIN, INT32_MAX, uint16_t, IC_MOLD_UNSIGNED_INT, 0, UINT16_MAX)
-    // Add more entries here
-IC_CASTING_FUNCTIONS(MY_CASTING_MATRIX)
+MY_APP_RESULT_TYPE(Matrix4x4)
 
-int main(void)
-{
-    int32_t count = 10;
-    uint16_t* values = IC_MALLOC_ARRAY(uint16_t, count);
-    if (!values) return 1;
+Matrix4x4Result mat4_inverse(const Matrix4x4* const m);
 
-    int32_t i = 0;
-    IC_BOUNDED_WHILE(i < count, 1000) {
-        values[i] = cast_int32_t_to_uint16_t(i);
-        i++;
-    }
-
-    free(values);
-    return 0;
-}
+// Usage
+Matrix4x4Result res = mat4_inverse(&m);
+if (!res.ok) { /* handle error */ }
 ```
 
 ## Read more?
+This document is only a quick intro.
+
+- For for more in-depth explanations of the headers, [go here](docs/header_library.md).
+- For ideas on how to use the library in your project, [go here](docs/using_in_your_system.md).
+- For premade monolithic files, [go here](docs/setup_for_you). These are referenced in documentation.
 
 # TODO
 - Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
 - Add tests that can be verified on multiple compilers
 - Add IronHammerC testing system
-- link to other doc files in Read more
-- Update table of contents
+- Implement Make it your own section in using_in_your_system

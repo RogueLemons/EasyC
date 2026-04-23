@@ -3,7 +3,20 @@ A drop-in, header-only library designed for easy integration into any C project.
 
 It provides a set of portable utilities that abstract away common inconsistencies across compilers and C standards. The goal is to improve safety, portability, and clarity in low-level C code while keeping the API minimal and predictable. 
 
-This library does not *aim* to build a macro language inside C. Instead, it views macros in three parts: 1) provide small, necessary, and practical abstractions that make writing safe, consistent C code easier without hiding the language itself; 2) provide certain almost necessary macros to simply standardize certain setups in headers; and 3) provide macros that are used to best effect by generating code once in one place and then writing normal C code thereafter. 
+The libraryt uses macros in three ways: 1) provide small, necessary, and practical abstractions that make writing safe, consistent C code easier without hiding the language itself; 2) provide almost necessary macros to simply standardize certain setups in headers; and 3) provide macros that are used to best effect by generating code once in one place and then writing normal C code thereafter. 
+
+## Table of Contents
+* [Header Library](#header-library)
+  * [ic.h](#ich)
+  * [ic_static_assert.h](#ic_static_asserth)
+  * [ic_inline.h](#ic_inlineh)
+  * [ic_typenum.h](#ic_typenumh)
+  * [ic_opaque_storage.h](#ic_opaque_storageh)
+  * [ic_result.h](#ic_resulth)
+  * [ic_memory.h](#ic_memoryh)
+  * [ic_bounded_loop.h](#ic_bounded_looph)
+  * [ic_num_cast.h](#ic_num_casth)
+* [Using in your system]
 
 ## ic.h
 A simple header that includes all other headers.
@@ -160,14 +173,14 @@ typedef struct ColorImpl ColorImpl;
 IC_OPAQUE_IMPL_ASSERT(ColorImpl, COLOR_ALIGN, COLOR_SIZE)
 
 void color_init(Color* c, int r, int g, int b) {
-    ColorImpl* real = (ColorImpl*)c;
+    ColorImpl* real = (ColorImpl*)c.data;
     real->r = r;
     real->g = g;
     real->b = b;
 }
 
 int color_get_red(const Color* c) {
-    const ColorImpl* real = (const ColorImpl*)c;
+    const ColorImpl* real = (const ColorImpl*)c.data;
     return real->r;
 }
 ```
@@ -392,6 +405,9 @@ Cast functions are generated using `IC_CASTING_FUNCTIONS` and a user-defined typ
 ### Why use this?
 It exists because numeric casting in C is unsafe by default: overflow, underflow, and undefined behavior can occur silently, especially across signed/unsigned or float/integer boundaries. This abstraction makes it possible to perform conversions in a deterministic and portable way, with explicit guarantees about behavior. This results in safer numeric code, fewer hidden bugs, and consistent handling of edge cases like NaN and infinity.
 
+### Setup for you
+A header file full of generated cast functions is [provided here](setup_for_you/numbers.h). 
+
 ### Example
 Use this system to create a single header file in which all common number types exist.
 
@@ -467,9 +483,10 @@ static inline int32_t cast_uint32_t_to_int32_t(const uint32_t v)
     if (INT32_MAX > UINT32_MAX) {
         return (int32_t)v;
     }
-    /* otherwise clamp or assert */
+    // otherwise clamp or assert
     return (int32_t)(v > INT32_MAX ? INT32_MAX : v);
 }
 ```
 
-## Further reading
+## Using in your system
+For more reading on how to use this library in your application, [go here](using_in_your_system.md).
