@@ -10,6 +10,7 @@ IronCLib is not a new programming model, just focused tools that make C code mor
 * [Quick Intro](#quick-intro)
 * [Library Overview](#library-overview)
 * [Read more?](#read-more)
+* [License](#license)
 * [TODO](#todo)
 
 ## Quick Intro
@@ -147,6 +148,10 @@ This document is only a quick intro.
 - For for more in-depth explanations of the headers, [go here](docs/header_library.md).
 - For ideas on how to use the library in your project, [go here](docs/using_in_your_system.md).
 - For premade monolithic files, [go here](docs/premade). These are referenced in documentation.
+
+## License
+
+IronCLib is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 # TODO
 - Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
