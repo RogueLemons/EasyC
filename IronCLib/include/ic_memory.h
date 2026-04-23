@@ -87,7 +87,7 @@ IC_HEADER_FUNC void* ic_inner_malloc_array_impl(const size_t count, const size_t
         return NULL;
     }
 
-    /* Overflow check */
+    // Overflow check
     if (count > ((size_t)-1) / elem_size) {
         return NULL;
     }
