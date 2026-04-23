@@ -173,17 +173,19 @@ typedef struct ColorImpl ColorImpl;
 IC_OPAQUE_IMPL_ASSERT(ColorImpl, COLOR_ALIGN, COLOR_SIZE)
 
 void color_init(Color* c, int r, int g, int b) {
-    ColorImpl* real = (ColorImpl*)c.data;
+    ColorImpl* real = (ColorImpl*)c;
     real->r = r;
     real->g = g;
     real->b = b;
 }
 
 int color_get_red(const Color* c) {
-    const ColorImpl* real = (const ColorImpl*)c.data;
+    const ColorImpl* real = (const ColorImpl*)c;
     return real->r;
 }
 ```
+
+*Note: Although IC_OPAQUE_STORAGE aligns data internally, strict aliasing rules to not promise to work for pointer casts (even if in practice they sometimes do). Furthermore, the internal bytes of the opaque struct is aligned yet C makes no promise that a one-field struct shares the alignment of its single field (even if in practice it often does). The safest option is to use memcpy internally (even if it might be slower for large structs).*
 
 #### Usage
 ```c
