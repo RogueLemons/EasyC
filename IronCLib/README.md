@@ -1,25 +1,14 @@
 # IronCLib
-A small, header-only C library for writing safer, more consistent C code. 
+IronCLib is a small, header-only C library for writing safer, more consistent C code.
 
-IronCLib is both a utility library and a set of design patterns for structuring C codebases.
+It provides independent, composable utilities that address common pitfalls like unsafe casts, fragile headers, and inconsistent error handling. Each header works on its own, with no external setup required.
 
-Each utility is stand-alone. IronCLib provides small, composable building blocks for safer, more consistent C code. Best-effort C89 compatibility, where reasonably practical.
-
-Includes:
-* Ready-to-use utilities (use in your project right now)
-  * Compile-time assertions (`ic_static_assert.h`)
-  * Inline and header safety abstractions (`ic_inline.h`)
-  * Memory allocation safety checks (`ic_memory.h`)
-  * Bounded loop safety utilities (`ic_bounded_loop.h`)
-* Code generation utilities (ad-hoc and monolithic)
-  * Type-safe enum replacement (`ic_typenum.h`)
-  * Safer numeric casting function generators (`ic_num_cast.h`)
-  * Opaque struct storage for encapsulation (`ic_opaque_storage.h`)
-  * Result-based error handling (`ic_result.h`)
+IronCLib is not a new programming model, just focused tools that make C code more predictable, portable, and easier to reason about. Best-effort C89 compatibility, where reasonably practical.
 
 ## Table of Contents
-* [Overview](#ironclib)
+* [IronCLib](#ironclib)
 * [Quick Intro](#quick-intro)
+* [Library Overview](#library-overview)
 * [Read more?](#read-more)
 * [TODO](#todo)
 
@@ -135,6 +124,22 @@ Matrix4x4Result mat4_inverse(const Matrix4x4* const m);
 Matrix4x4Result res = mat4_inverse(&m);
 if (!res.ok) { /* handle error */ }
 ```
+
+## Library Overview
+
+IronCLib is split into small, independent headers. You can use any part on its own.
+
+**Use immediately**
+- `ic_static_assert.h` — compile-time validation of assumptions
+- `ic_inline.h` — portable inline + safe header functions
+- `ic_memory.h` — safer allocation and alignment helpers
+- `ic_bounded_loop.h` — enforce maximum loop iterations
+
+**Generate standardized code**
+- `ic_typenum.h` — type-safe enum patterns with helpers
+- `ic_num_cast.h` — safe, overflow-aware numeric casting
+- `ic_opaque_storage.h` — encapsulated, stack-allocated types
+- `ic_result.h` — explicit result-based error handling
 
 ## Read more?
 This document is only a quick intro.
