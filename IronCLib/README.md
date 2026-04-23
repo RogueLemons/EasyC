@@ -151,5 +151,5 @@ This document is only a quick intro.
 # TODO
 - Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
 - Add tests that can be verified on multiple compilers
-- Add IronHammerC testing system
+- Add IronHammerC testing system (and guarantee for tested compilers)
 - Implement Make it your own section in using_in_your_system
