@@ -135,8 +135,12 @@ CONVERSION SAFETY CHECKS
 
 // Clamp at runtime (no UB)
 #define IC_INNER_CLAMP_SIGNED_INT_TO_UNSIGNED_INT(to_t, v, lo, hi) \
-    ((to_t)((v) < 0 ? 0 : \
-    ((unsigned long long)(v) > (unsigned long long)(hi) ? (hi) : (v))))
+    ((to_t)( \
+        ((v) < 0) ? 0ULL : \
+        ((unsigned long long)(v) > (unsigned long long)(hi)) ? \
+            (unsigned long long)(hi) : \
+            (unsigned long long)(v) \
+    ))
 
 // ---------------------- SIGNED INT -> FLOAT ---------------------- 
 

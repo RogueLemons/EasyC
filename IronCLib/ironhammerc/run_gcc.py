@@ -1,49 +1,56 @@
-import subprocess
 import os
+import subprocess
 import shutil
 
-# -----------------------------
-# Anchor paths
-# -----------------------------
+# -------------------------------------------------
+# Anchor to script location
+# -------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-source_file = os.path.join(BASE_DIR, "main.c")
+BUILD_DIR = os.path.join(BASE_DIR, "build", "gcc_single")
+EXE_PATH = os.path.join(BUILD_DIR, "hammer_ironclib.exe")
 
-build_dir = os.path.join(BASE_DIR, "build", "gcc_single")
-os.makedirs(build_dir, exist_ok=True)
+# -------------------------------------------------
+# Optional clean
+# -------------------------------------------------
+def clean():
+    shutil.rmtree(BUILD_DIR, ignore_errors=True)
 
-output_file = os.path.join(build_dir, "hammer_ironclib.exe")
+clean()
 
-# -----------------------------
-# Check GCC
-# -----------------------------
-def tool_exists(cmd):
-    return shutil.which(cmd) is not None
+os.makedirs(BUILD_DIR, exist_ok=True)
 
-if not tool_exists("gcc"):
-    print("❌ gcc not found in PATH")
-    raise SystemExit(1)
-
-# -----------------------------
-# Compile
-# -----------------------------
-print("🔧 GCC build (C11, -O2)")
+# -------------------------------------------------
+# Configure CMake (SOURCE OF TRUTH)
+# -------------------------------------------------
+print("⚙️ Configuring CMake...")
 
 subprocess.check_call([
-    "gcc",
-    "-std=c11",
-    "-O2",
-    source_file,
-    "-o",
-    output_file
+    "cmake",
+    "-S", BASE_DIR,
+    "-B", BUILD_DIR,
+    "-G", "Ninja",              # or "MinGW Makefiles"
+    "-DCMAKE_BUILD_TYPE=Release"
 ])
 
-print("✔ Build success")
+# -------------------------------------------------
+# Build
+# -------------------------------------------------
+print("🔨 Building...")
 
-# -----------------------------
+subprocess.check_call([
+    "cmake",
+    "--build", BUILD_DIR
+])
+
+# -------------------------------------------------
 # Run
-# -----------------------------
-print("\n🚀 Running...\n")
+# -------------------------------------------------
+print("🚀 Running...\n")
 
-result = subprocess.run(output_file)
+if not os.path.exists(EXE_PATH):
+    raise FileNotFoundError(f"Executable not found: {EXE_PATH}")
+
+result = subprocess.run(EXE_PATH)
+
 print(f"\n🏁 Exit code: {result.returncode}")

@@ -6,7 +6,6 @@ import shutil
 # Paths (portable)
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SRC_DIR = BASE_DIR
 BUILD_ROOT = os.path.join(BASE_DIR, "build")
 
 # -----------------------------
@@ -19,7 +18,8 @@ configs = [
 ]
 
 # -----------------------------
-# Test matrix
+# Test matrix (now ONLY metadata)
+# CMake decides actual flags
 # -----------------------------
 tests = [
     ("c89", "-O0"),
@@ -61,7 +61,7 @@ for compiler_name, compiler, generator in configs:
     for std, opt in tests:
 
         # -----------------------------
-        # Build folder
+        # Build directory
         # -----------------------------
         build_dir = os.path.join(
             BUILD_ROOT,
@@ -73,22 +73,20 @@ for compiler_name, compiler, generator in configs:
         shutil.rmtree(build_dir, ignore_errors=True)
 
         # -----------------------------
-        # Configure
+        # Configure CMake (SOURCE OF TRUTH)
         # -----------------------------
         cmake_cmd = [
             "cmake",
-            "-S", SRC_DIR,
+            "-S", BASE_DIR,
             "-B", build_dir,
-            "-G", generator
+            "-G", generator,
+            f"-DCOMPILER_NAME={compiler_name}",
+            f"-DC_STD={std}",
+            f"-DOPT_LEVEL={opt},"
         ]
 
         if compiler:
             cmake_cmd.append(f"-DCMAKE_C_COMPILER={compiler}")
-
-        if compiler_name != "msvc":
-            cmake_cmd.append(f"-DCMAKE_C_FLAGS=-std={std} {opt}")
-        else:
-            cmake_cmd.append("-DCMAKE_C_FLAGS=")
 
         run(cmake_cmd)
 
@@ -109,6 +107,11 @@ for compiler_name, compiler, generator in configs:
             exe = os.path.join(build_dir, "Release", "hammer_ironclib.exe")
         else:
             exe = os.path.join(build_dir, "hammer_ironclib.exe")
+
+        if not os.path.exists(exe):
+            print(f"❌ Missing executable: {exe}")
+            failures.append((f"{compiler_name}-{std}-{opt}", -1))
+            continue
 
         # -----------------------------
         # Run test
