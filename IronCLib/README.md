@@ -151,6 +151,9 @@ These introduce stronger design patterns and are most effective when used consis
 - `ic_opaque_storage.h`
 - `ic_result.h`
 
+> *Note: IronCLib works best when adopted consistently within a module.*  
+> *Avoid mixing its patterns with raw C equivalents, and don’t adopt everything at once—start small and expand only where it adds value.*
+
 ## Read more?
 This document is only a quick intro.
 
