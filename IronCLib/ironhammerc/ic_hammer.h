@@ -159,55 +159,52 @@ typedef struct {
 // =========================
 //   Assertions (fatal)
 // =========================
-#define IHC_ASSERT(expr) do {                               \
-    if (expr) {                                                   \
-        ihc_passed_checks++;                                \
-    } else {                                                      \
-        ihc_failed_checks++;                                \
-        IHC_PRINT("ASSERT FAIL", ihc_current_test,    \
-                         #expr, 0, 0);                            \
-        return;                                                   \
-    }                                                             \
+#define IHC_ASSERT(expr) do {                                       \
+    if (expr) {                                                     \
+        ihc_passed_checks++;                                        \
+    } else {                                                        \
+        ihc_failed_checks++;                                        \
+        IHC_PRINT("ASSERT FAIL", ihc_current_test, #expr, 0, 0);    \
+        return;                                                     \
+    }                                                               \
 } while (0)
 
 // =========================
 //   Checks (non-fatal)
 // =========================
-#define IHC_CHECK(expr) do {                                \
-    if (expr) {                                                   \
-        ihc_passed_checks++;                                \
-    } else {                                                      \
-        ihc_failed_checks++;                                \
-        IHC_PRINT("CHECK FAIL", ihc_current_test,     \
-                         #expr, 0, 0);                            \
-    }                                                             \
+#define IHC_CHECK(expr) do {                                        \
+    if (expr) {                                                     \
+        ihc_passed_checks++;                                        \
+    } else {                                                        \
+        ihc_failed_checks++;                                        \
+        IHC_PRINT("CHECK FAIL", ihc_current_test, #expr, 0, 0);     \
+    }                                                               \
 } while (0)
  
 // =========================
 //   Run tests
 // =========================
-#define IHC_RUN(list) do {                                  \
+#define IHC_RUN(list) do {                                          \
     IHC_PRINT("\n================= IRON HAMMER TEST RUN =================", "", "", 0, 0); \
-                                                                   \
-    unsigned int count = (sizeof(list) / sizeof((list)[0]));             \
-                                                                   \
-    for (unsigned int i = 0; i < count; ++i) {                   \
-        ihc_current_test = (list)[i].name;                 \
-        unsigned int before = ihc_failed_checks;           \
-                                                                   \
-        IHC_PRINT("RUN", ihc_current_test, "", 0, 0); \
-                                                                   \
-        (list)[i].fn();                                           \
-                                                                   \
-        if (ihc_failed_checks == before) {                 \
-            ihc_passed_tests++;                            \
-            IHC_PRINT("PASS", ihc_current_test, "", 0, 0); \
-        } else {                                                  \
-            ihc_failed_tests++;                            \
-            IHC_PRINT("FAIL", ihc_current_test,      \
-                             "test failed count", ihc_failed_tests, 1);               \
-        }                                                         \
-    }                                                             \
+                                                                    \
+    unsigned int count = (sizeof(list) / sizeof((list)[0]));        \
+                                                                    \
+    for (unsigned int i = 0; i < count; ++i) {                      \
+        ihc_current_test = (list)[i].name;                          \
+        unsigned int before = ihc_failed_checks;                    \
+                                                                    \
+        IHC_PRINT("RUN", ihc_current_test, "", 0, 0);               \
+                                                                    \
+        (list)[i].fn();                                             \
+                                                                    \
+        if (ihc_failed_checks == before) {                          \
+            ihc_passed_tests++;                                     \
+            IHC_PRINT("PASS", ihc_current_test, "", 0, 0);          \
+        } else {                                                    \
+            ihc_failed_tests++;                                     \
+            IHC_PRINT("FAIL", ihc_current_test, "test failed count", ihc_failed_tests, 1); \
+        }                                                           \
+    }                                                               \
 } while (0)
 
  
@@ -216,21 +213,21 @@ typedef struct {
 // =========================
 #define IHC_REPORT() do {                                   \
     IHC_PRINT("\n================= IRON HAMMER C REPORT =================", "", "", 0, 0); \
-                                                                   \
-    unsigned int total_tests =                                    \
-        ihc_passed_tests + ihc_failed_tests;          \
-                                                                   \
-    unsigned int total_checks =                                   \
-        ihc_passed_checks + ihc_failed_checks;        \
-                                                                   \
-    IHC_PRINT("REPORT", "tests_passed", "",               \
-                    ihc_passed_tests, 1);                  \
-                                                                   \
-    IHC_PRINT("REPORT", "tests_total", "",                \
-                    total_tests, 1);                             \
-                                                                   \
-    IHC_PRINT("REPORT", "checks_total", "",               \
-                    total_checks, 1);                            \
+                                                            \
+    unsigned int total_tests =                              \
+        ihc_passed_tests + ihc_failed_tests;                \
+                                                            \
+    unsigned int total_checks =                             \
+        ihc_passed_checks + ihc_failed_checks;              \
+                                                            \
+    IHC_PRINT("REPORT", "tests_passed", "",                 \
+                    ihc_passed_tests, 1);                   \
+                                                            \
+    IHC_PRINT("REPORT", "tests_total", "",                  \
+                    total_tests, 1);                        \
+                                                            \
+    IHC_PRINT("REPORT", "checks_total", "",                 \
+                    total_checks, 1);                       \
 } while (0)
 
 #endif // IC_IRON_HAMMER_H
