@@ -70,8 +70,8 @@ IHC_REPORT();
 
 ### Assertions
 ```c
-IHC_ASSERT(expr) → fatal failure (stops test)
-IHC_CHECK(expr)  → non-fatal failure (continues test)
+IHC_ASSERT(expr) -> fatal failure (stops test)
+IHC_CHECK(expr)  -> non-fatal failure (continues test)
 ```
 
 ### Output hook
