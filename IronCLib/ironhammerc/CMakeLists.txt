@@ -16,7 +16,13 @@ target_include_directories(hammer_ironclib PRIVATE
 
 if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(hammer_ironclib PRIVATE
-        -Wall -Wextra -Wpedantic -Werror
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+
+        # macro-generated static_assert typedef noise ----
+        -Wno-unused-local-typedefs
     )
 endif()
 

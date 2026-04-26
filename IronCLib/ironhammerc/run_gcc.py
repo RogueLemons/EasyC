@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import sys
 
 # -------------------------------------------------
 # Anchor to script location
@@ -8,7 +9,14 @@ import shutil
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 BUILD_DIR = os.path.join(BASE_DIR, "build", "gcc_single")
-EXE_PATH = os.path.join(BUILD_DIR, "hammer_ironclib.exe")
+
+# Detect platform-specific executable name
+if os.name == "nt":
+    EXE_NAME = "hammer_ironclib.exe"
+else:
+    EXE_NAME = "hammer_ironclib"
+
+EXE_PATH = os.path.join(BUILD_DIR, EXE_NAME)
 
 # -------------------------------------------------
 # Optional clean
@@ -21,22 +29,42 @@ clean()
 os.makedirs(BUILD_DIR, exist_ok=True)
 
 # -------------------------------------------------
-# Configure CMake (SOURCE OF TRUTH)
+# Choose generator (fallback-friendly)
 # -------------------------------------------------
-print("⚙️ Configuring CMake...")
+def get_cmake_generator():
+    # Prefer Ninja if available
+    try:
+        subprocess.run(["ninja", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return "Ninja"
+    except FileNotFoundError:
+        pass
+
+    # Windows fallback
+    if os.name == "nt":
+        return "MinGW Makefiles"
+
+    # Linux/macOS fallback
+    return "Unix Makefiles"
+
+GENERATOR = get_cmake_generator()
+
+# -------------------------------------------------
+# Configure CMake
+# -------------------------------------------------
+print("Configuring CMake...")
 
 subprocess.check_call([
     "cmake",
     "-S", BASE_DIR,
     "-B", BUILD_DIR,
-    "-G", "Ninja",              # or "MinGW Makefiles"
+    "-G", GENERATOR,
     "-DCMAKE_BUILD_TYPE=Release"
 ])
 
 # -------------------------------------------------
 # Build
 # -------------------------------------------------
-print("🔨 Building...")
+print("Building...")
 
 subprocess.check_call([
     "cmake",
@@ -46,11 +74,12 @@ subprocess.check_call([
 # -------------------------------------------------
 # Run
 # -------------------------------------------------
-print("🚀 Running...\n")
+print("Running...\n")
 
 if not os.path.exists(EXE_PATH):
     raise FileNotFoundError(f"Executable not found: {EXE_PATH}")
 
-result = subprocess.run(EXE_PATH)
+# Use list form for better cross-platform handling
+result = subprocess.run([EXE_PATH])
 
-print(f"\n🏁 Exit code: {result.returncode}")
+print(f"\nExit code: {result.returncode}")

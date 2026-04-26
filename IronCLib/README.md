@@ -3,7 +3,7 @@ IronCLib is a small, header-only C library for writing safer, more consistent C 
 
 It provides independent, composable utilities that address common pitfalls like unsafe casts, fragile headers, and inconsistent error handling. Each header works on its own, with no external setup required.
 
-IronCLib is not a new programming model, just focused tools that make C code more predictable, portable, and easier to reason about. Best-effort C89 compatibility, where reasonably practical.
+IronCLib is not a new programming model, just focused tools that make C code more predictable, portable, and easier to reason about. Best-effort C99 compatibility, where reasonably practical.
 
 ## Table of Contents
 * [IronCLib](#ironclib)
@@ -160,6 +160,7 @@ This document is only a quick intro.
 - For for more in-depth explanations of the headers, [go here](docs/header_library.md).
 - For ideas on how to use the library in your project, [go here](docs/using_in_your_system.md).
 - For premade monolithic files, [go here](docs/premade). These are referenced in documentation.
+- For a minimal, header-based test-framework or information on how IronCLib is tested, [go here](ironhammerc).
 
 ## License
 IronCLib is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
@@ -167,11 +168,12 @@ IronCLib is licensed under the MIT License. See the [LICENSE](LICENSE) file for 
 ## Build Requirements
 MSVC (/W4 + /WX) requires /wd4127 due to `do { ... } while(0)` macros. GCC and Clang handle this pattern without issues.
 
-When using `ic_num_cast.h`, some compilers (especially non-GCC/Clang/MSVC or non-standard toolchains) may require manual warning suppression depending on their diagnostic system and C standard support.
+When using `ic_num_cast.h`, some compilers (especially non-GCC, non-Clang, or non-MSVC, or non-standard toolchains) may require manual warning suppression depending on their diagnostic system and C standard support.
+
+`ic_static_assert.h` uses native static assert when available, otherwise a typedef-based fallback is used, which may trigger unused-typedef warnings depending on the compiler (handle with e.g. `-Wno-unused-local-typedefs` on GCC/Clang).
 
 # TODO
 - Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
 - Add tests that can be verified on multiple compilers
 - Add guarantee for tested compilers
 - Verify once more implementation of ic_num_cast.h
-- Add Iron Hammer C readme
