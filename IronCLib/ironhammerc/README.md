@@ -15,7 +15,7 @@ It is intentionally minimal and designed to run on a wide range of toolchains an
 - `ic_hammer.h`: Header-only test framework used by all tests.
 - `tests/`: Test cases written using the Iron Hammer C API.
 - `main.c`: Entry point that registers and runs all tests.
-- `cmake/` (or root `CMakeLists.txt`): Build configuration for all supported compilers and standards.
+- `CMakeLists.txt`: Build configuration for all supported compilers and standards.
 - `run_all.py`: Runs the full compiler matrix (GCC / Clang / MSVC across C99/C11 and optimization levels).
 - `run_gcc.py` (optional helper): Convenience script for local single-tool runs.
 
