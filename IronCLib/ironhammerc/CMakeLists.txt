@@ -6,10 +6,13 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(hammer_ironclib 
     main.c
+    tests/inline_func_wrapper_a.c
+    tests/inline_func_wrapper_b.c
 )
 
 target_include_directories(hammer_ironclib PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/../ironclib
 )
