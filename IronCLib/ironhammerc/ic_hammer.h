@@ -199,10 +199,10 @@ typedef struct {
                                                                     \
         if (ihc_failed_checks == before) {                          \
             ihc_passed_tests++;                                     \
-            IHC_PRINT("PASS", ihc_current_test, "", 0, 0);          \
+            IHC_PRINT("PASS", "", "", 0, 0);          \
         } else {                                                    \
             ihc_failed_tests++;                                     \
-            IHC_PRINT("FAIL", ihc_current_test, "test failed count", ihc_failed_tests, 1); \
+            IHC_PRINT("FAIL", "", "test failed count", ihc_failed_tests, 1); \
         }                                                           \
     }                                                               \
 } while (0)

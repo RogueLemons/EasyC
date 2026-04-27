@@ -114,7 +114,7 @@ Example:
 */
 
 #define IC_MALLOC_ARRAY(type, size) \
-    ((type *)ic_malloc_array_impl( \
+    ((type *)ic_inner_malloc_array_impl( \
         ((size) <= 0) ? 0u : (size_t)(size), \
         sizeof(type)))
 

@@ -13,7 +13,8 @@ do { \
 #include "ic_static_assert.h"
 
 // Test cases
-#include "tests/ic_inline_test.h"
+#include "tests/inline_test.h"
+#include "tests/memory_test.h"
 
 IC_STATIC_ASSERT(8 == 2*4, "A simple verification that the static assert macro works correctly");
 
@@ -22,6 +23,10 @@ int main(void) {
     const ihc_test_case my_tests[] = 
     {
         IHC_TEST_ENTRY(verify_header_functions_can_be_used_in_multiple_source_files),
+        IHC_TEST_ENTRY(verify_memory_protects_against_negative_size),
+        IHC_TEST_ENTRY(verify_memory_protects_against_zero_size),
+        IHC_TEST_ENTRY(verify_memory_protects_against_overflow),
+        IHC_TEST_ENTRY(verify_memory_allocates_valid_array),
     };
 
     IHC_RUN(my_tests);
