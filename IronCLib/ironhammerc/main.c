@@ -15,6 +15,7 @@ do { \
 // Test cases
 #include "tests/inline_test.h"
 #include "tests/memory_test.h"
+#include "tests/bounded_loop_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -25,7 +26,7 @@ IHC_TEST(verify_static_assert_works_inside_functions)
 
 int main(void) {
 
-    const ihc_test_case my_tests[] = 
+    const ihc_test_case iron_c_lib_tests[] = 
     {
         IHC_TEST_ENTRY(verify_static_assert_works_inside_functions),
         IHC_TEST_ENTRY(verify_header_functions_can_be_used_in_multiple_source_files),
@@ -33,9 +34,15 @@ int main(void) {
         IHC_TEST_ENTRY(verify_memory_protects_against_zero_size),
         IHC_TEST_ENTRY(verify_memory_protects_against_overflow),
         IHC_TEST_ENTRY(verify_memory_allocates_valid_array),
+        IHC_TEST_ENTRY(verify_bounded_while_prevents_infinite_loops),
+        IHC_TEST_ENTRY(verify_bounded_while_works_as_normal_within_bounds),
+        IHC_TEST_ENTRY(verify_bounded_while_treats_non_positive_bounds_as_zero),
+        IHC_TEST_ENTRY(verify_bounded_do_while_prevents_infinite_loops),
+        IHC_TEST_ENTRY(verify_bounded_do_while_works_as_normal_within_bounds),
+        IHC_TEST_ENTRY(verify_bounded_do_while_treats_non_positive_bounds_as_zero),
     };
 
-    IHC_RUN(my_tests);
+    IHC_RUN(iron_c_lib_tests);
     IHC_REPORT();
 
     return ihc_failures();

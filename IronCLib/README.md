@@ -198,5 +198,5 @@ All headers are verified against:
 | msvc     | C11       | O2          | Verified |
 
 # TODO
-- Add more tests (Bounded loops, Type-safe enums, Numeric casting functions, Opaque storage, Standardized result types)
+- Add more tests (Type-safe enums, Numeric casting functions, Opaque storage, Standardized result types)
 - Verify once more implementation of ic_num_cast.h
