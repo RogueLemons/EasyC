@@ -43,6 +43,9 @@ IHC_TEST(verify_optional_accessor_macros_work)
 
 IC_HEADER_FUNC IntResult test_try_propagation(const Error expected_return_error)
 {
+    const StringViewResult success_res = StringViewResult_ok("This is good and will not return early");
+    IC_TRY_RETURN_ERR_AS(IntResult, success_res);
+
     const FloatResult fail_res = FloatResult_err(expected_return_error);
     IC_TRY_RETURN_ERR_AS(IntResult, fail_res);
 
