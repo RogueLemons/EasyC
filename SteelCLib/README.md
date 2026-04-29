@@ -6,6 +6,7 @@ An upcoming project and expansion of IronCLib that offers more flexibility at a 
 - Consider adding a macro tag for IC_TYPENUM that converts everything to a simple typedef of the inner type
 - Add optional system to opaque storage that can be turned on and off with a macro tag, that includes IC_OPAQUE_LOAD and IC_OPAQUE_STORE that handles aliasing safety through hard-copying internal bytes, but will without the tag just to fast pointer casting
 - For opaque storage, in fallback case where alignas does not exist, handle it manually by allocating enough memory for sizeof + alignof and manually align with uintptr_t in source
+- For opaque storage, add malloc mode
 - Add debug mode that uses runtime assert that can be turned off with macro tag (e.g. for accessing Result types)
 - Consider removing result accessors (e.g. IC_RESULT_VALUE) and replace with functions for const safety (maybe overkill? Could include asserts, probably do this for SteelCLib instead)
 - Expand typenum for SteelCLib to take a manually assigned comparitor for compatability with all inner types
