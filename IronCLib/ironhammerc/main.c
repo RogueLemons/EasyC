@@ -18,6 +18,7 @@ do { \
 #include "tests/bounded_loop_test.h"
 #include "tests/typenum_test.h"
 #include "tests/num_cast_test.h"
+#include "tests/opaque_storage_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -57,6 +58,11 @@ int main(void) {
         IHC_TEST_ENTRY(verify_signed_integer_conversions_for_large_type_to_small_type),
         IHC_TEST_ENTRY(verify_unsigned_integer_conversions_for_large_type_to_small_type),
         IHC_TEST_ENTRY(verify_floating_point_conversions_for_large_type_to_small_type),
+        // ic_opaque_storage.h
+        IHC_TEST_ENTRY(verify_opaque_strict_object_can_be_initiated_with_zeroes),
+        IHC_TEST_ENTRY(verify_opaque_strict_object_can_set_and_get_values),
+        IHC_TEST_ENTRY(verify_opaque_fast_object_can_be_initiated_with_zeroes),
+        IHC_TEST_ENTRY(verify_opaque_fast_object_can_set_and_get_values),
     };
 
     IHC_RUN(iron_c_lib_tests);

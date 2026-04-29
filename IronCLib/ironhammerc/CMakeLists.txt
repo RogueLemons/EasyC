@@ -8,6 +8,7 @@ add_executable(hammer_ironclib
     main.c
     tests/inline_func_wrapper_a.c
     tests/inline_func_wrapper_b.c
+    tests/opaque_structs.c
 )
 
 target_include_directories(hammer_ironclib PRIVATE

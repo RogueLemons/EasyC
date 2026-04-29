@@ -56,6 +56,7 @@ Alignment support
 
 #else
 
+    #define IC_ALIGNAS_IS_BLANK
     #define IC_ALIGNAS(x)
     #define IC_ALIGNOF(x) (offsetof(struct { ic_byte c; x member; }, member))
 

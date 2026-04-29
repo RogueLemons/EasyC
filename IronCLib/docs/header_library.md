@@ -211,11 +211,13 @@ if (color_get_red(&c) > 50)
 ```c
 typedef unsigned char ic_byte;
 typedef struct {
-    /*align as COLOR_ALIGN*/ ic_byte data[COLOR_SIZE];
+    _Alignas(COLOR_ALIGN) ic_byte data[COLOR_SIZE];
 } Color;
 ```
 
 `IC_OPAQUE_IMPL_ASSERT` is required in the `.c` file because it performs compile-time validation of the real `struct ColorImpl` definition. It ensures that the actual struct’s size and alignment match the declared `COLOR_SIZE` and `COLOR_ALIGN`. Without this check, there is no guarantee that the internal implementation fits the opaque storage, which can lead to ABI mismatches or undefined behavior.
+
+> *Note: In the case that aligning data is unsupported then IC_ALIGNAS_IS_BLANK will be defined, allowing for checks and different compile-time behavior from user (e.g. using memcpy instead of pointer cast, or manually aligning with uintptr_t).*
 
 ### What NOT to do
 - Do not cast directly between opaque type pointers and internal structs unless inside the implementation file.

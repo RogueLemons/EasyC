@@ -77,6 +77,22 @@ IMPORTANT RULES
 #include "ic_static_assert.h"
 #include "ic_memory.h"
 
+/*
+===============================================================================
+Alignment policy
+
+Avoid max_align_t entirely because:
+- MSVC C mode does not reliably expose it
+- cross-platform behavior is inconsistent
+- engine systems should not depend on platform typedefs
+
+Instead use a fixed safe upper bound.
+===============================================================================
+*/
+
+#ifndef IC_MAX_ALIGNMENT
+    #define IC_MAX_ALIGNMENT 16
+#endif
 
 /*
 ===============================================================================
@@ -84,26 +100,12 @@ Opaque storage definition (for headers)
 ===============================================================================
 */
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L || \
-    defined(_MSC_VER) || defined(__GNUC__)
-
-    #define IC_OPAQUE_STORAGE(name, alignment, size) \
-        IC_STATIC_ASSERT((alignment) <= IC_ALIGNOF(max_align_t), "alignment too large"); \
-        typedef struct { \
-            IC_ALIGNAS(alignment) ic_byte data[(size)]; \
-        } name;
-
-#else
-
-    #define IC_OPAQUE_STORAGE(name, alignment, size) \
-        IC_STATIC_ASSERT((alignment) <= sizeof(max_align_t), "alignment too large"); \
-        typedef union { \
-            ic_byte data[(size)]; \
-            max_align_t _align; \
-        } name;
-
-#endif
-
+#define IC_OPAQUE_STORAGE(name, alignment, size)                     \
+    IC_STATIC_ASSERT((alignment) <= IC_MAX_ALIGNMENT, "alignment too large"); \
+                                                                      \
+    typedef struct {                                                  \
+        IC_ALIGNAS(alignment) ic_byte data[(size)];                  \
+    } name;
 
 /*
 ===============================================================================
@@ -111,7 +113,7 @@ Definition check (for .c files)
 ===============================================================================
 */
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#ifndef IC_ALIGNAS_IS_BLANK
 
     #define IC_OPAQUE_IMPL_ASSERT(name, alignment, size) \
         IC_STATIC_ASSERT(sizeof(name) == (size), "size mismatch"); \
