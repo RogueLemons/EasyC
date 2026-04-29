@@ -19,6 +19,7 @@ do { \
 #include "tests/typenum_test.h"
 #include "tests/num_cast_test.h"
 #include "tests/opaque_storage_test.h"
+#include "tests/result_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -63,6 +64,11 @@ int main(void) {
         IHC_TEST_ENTRY(verify_opaque_strict_object_can_set_and_get_values),
         IHC_TEST_ENTRY(verify_opaque_fast_object_can_be_initiated_with_zeroes),
         IHC_TEST_ENTRY(verify_opaque_fast_object_can_set_and_get_values),
+        // ic_result.h
+        IHC_TEST_ENTRY(verify_generation_of_simple_result_type_and_generated_functions),
+        IHC_TEST_ENTRY(verify_ok_and_err_functions_work_for_typenum_error),
+        IHC_TEST_ENTRY(verify_optional_accessor_macros_work),
+        IHC_TEST_ENTRY(verify_try_macro_propagates_error_in_same_error_type_context),
     };
 
     IHC_RUN(iron_c_lib_tests);
