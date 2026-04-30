@@ -105,7 +105,7 @@ IHC_TEST(verify_unsigned_integer_conversions_for_large_type_to_small_type)
     IHC_CHECK(arb_to_f32 == 789.0f);
     const f32 big_to_f32 = cast_u64_to_f32(u64_max);
     // cast functions forbid undefined behavior, underflow, and overflow, but allow precision loss
-    IHC_CHECK((0.999f * u64_max) <= big_to_f32 || big_to_f32 <= (1.001f * u64_max));
+    IHC_CHECK((0.999f * u64_max) <= big_to_f32 && big_to_f32 <= (1.001f * u64_max));
 }
 
 IHC_TEST(verify_floating_point_conversions_for_large_type_to_small_type)
