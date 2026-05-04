@@ -20,6 +20,7 @@ do { \
 #include "tests/num_cast_test.h"
 #include "tests/opaque_storage_test.h"
 #include "tests/result_test.h"
+#include "tests/concurrency_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -70,7 +71,9 @@ int main(void) {
         IHC_TEST_ENTRY(verify_optional_accessor_macros_work),
         IHC_TEST_ENTRY(verify_try_macro_propagates_error_in_same_error_type_context),
         // ic_concurrency.h
-        // (no tests yet)
+        IHC_TEST_ENTRY(verify_atomic_int_can_get_and_set_values_correctly),
+        IHC_TEST_ENTRY(verify_task_can_run_and_join_thread),
+        IHC_TEST_ENTRY(verify_mutex_can_be_locked_and_unlocked),
     };
 
     IHC_RUN(iron_c_lib_tests);
