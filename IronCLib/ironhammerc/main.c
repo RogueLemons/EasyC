@@ -69,6 +69,8 @@ int main(void) {
         IHC_TEST_ENTRY(verify_ok_and_err_functions_work_for_typenum_error),
         IHC_TEST_ENTRY(verify_optional_accessor_macros_work),
         IHC_TEST_ENTRY(verify_try_macro_propagates_error_in_same_error_type_context),
+        // ic_concurrency.h
+        // (no tests yet)
     };
 
     IHC_RUN(iron_c_lib_tests);
