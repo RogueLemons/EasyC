@@ -130,6 +130,46 @@ Matrix4x4Result res = mat4_inverse(&m);
 if (!res.ok) { /* handle error */ }
 ```
 
+### Multi-threading
+Standardized interface to create and manage threads across platforms. Comes with tasks (threads), mutexes, atomics, and a thread sleep.
+
+#### Atomic integers
+IronC provides one portable atomic 32-bit integer, safely set and accessed across threads.
+
+```c
+#include "ironclib/ic_concurrency.h"
+
+ic_atomic_i32 atom = ic_make_atomic(3); // atom = 3
+ic_atomic_store(&atom, 7);              // atom = 7
+int32_t val = ic_atomic_load(&atom);    // val  = 7
+```
+
+#### Run task in another thread
+A wrapper for portable threads, in the form of tasks, is provided.
+
+```c
+#include "ironclib/ic_concurrency.h"
+
+static int work(void* arg)
+{
+    int* value = (int*)arg;
+    (*value)++;
+    return 42;
+}
+
+int foo()
+{
+    ic_task task;
+    int value = 0;
+
+    ic_task_init(&task, work, &value);
+    // work in between init and join is done in parallel
+    ic_task_join(&task);
+
+    return value; // incremented by thread
+}
+```
+
 ## Library Overview
 IronCLib is split into small, independent headers. You can use any part on its own - but they are designed to be adopted gradually based on your needs.
 
@@ -148,6 +188,7 @@ Helpful tools that solve specific problems but don’t require architectural cha
 - `ic_bounded_loop.h`
 - `ic_typenum.h`
 - `ic_num_cast.h`
+- `ic_concurrency.h`
 
 ### Architectural patterns (adopt deliberately)
 These introduce stronger design patterns and are most effective when used consistently across a module or project.
@@ -177,6 +218,8 @@ When using `ic_num_cast.h`, some compilers (especially non-GCC, non-Clang, or no
 
 `ic_static_assert.h` uses native static assert when available, otherwise a typedef-based fallback is used, which may trigger unused-typedef warnings depending on the compiler (handle with e.g. `-Wno-unused-local-typedefs` on GCC/Clang).
 
+`ic_concurrency.h` requires `threads.h`/`stdatomic.h`, `pthread.h`, or `Windows.h` depending on platform.
+
 ## Build and Test Guarantees
 IronCLib is continuously tested on a build matrix covering multiple compilers, C standards, and optimization levels.
 
@@ -200,5 +243,6 @@ All headers are verified against:
 All configurations above are verified on Windows x86_64.
 
 # TODO
+- Add ic_concurrency section to header library documentation
 - Test on Linux platform as well
-- Add ic_concurrency readme
+- Add C++ compatability guards?

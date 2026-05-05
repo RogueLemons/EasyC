@@ -188,6 +188,7 @@ IHC_TEST(verify_get_result_fails_if_task_running)
     ic_task_init(&task, slow_thread, NULL);
 
     ic_thread_sleep(200); // Give the thread time to start and be in the middle of sleeping
+    IHC_CHECK(ic_task_is_running(&task) == 1);
     int result;
     int res = ic_task_get_result(&task, &result);
 
