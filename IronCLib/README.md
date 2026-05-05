@@ -200,7 +200,6 @@ All headers are verified against:
 All configurations above are verified on Windows x86_64.
 
 # TODO
-- Add ic_concurrency tests
 - Add ic_concurrency readme
 - Add more tests?
 - Verify once more implementation of ic_num_cast.h

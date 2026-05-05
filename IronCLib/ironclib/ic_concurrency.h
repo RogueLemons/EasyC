@@ -21,8 +21,9 @@ This header provides a portable concurrency layer consisting of:
 - ic_atomic_i32  (atomic integer type)
 - ic_task        (threaded task abstraction)
 - ic_mutex       (mutex abstraction)
+- ic_thread_sleep (cross-platform thread sleep function)
 
-Each struct exists with associated functions below it.
+The structs exist with associated functions below it.
 
 ===============================================================================
 
@@ -52,7 +53,7 @@ struct ic_task;
 typedef int (*ic_task_function)(void* arg);
 int ic_task_init(ic_task* t, ic_task_function func, void* arg);
 int ic_task_is_running(ic_task* t);
-int ic_task_get_result(ic_task* t, int* result_out);
+int ic_task_get_result(ic_task* t, int* out_result);
 int ic_task_join(ic_task* t);
 
 THREAD LOCKS (MUTEXES)
@@ -64,6 +65,10 @@ int  ic_mutex_trylock(ic_mutex* m);
 void ic_mutex_unlock(ic_mutex* m);
 int  ic_mutex_destroy(ic_mutex* m);
 
+SLEEP
+----------------------------------------
+void ic_thread_sleep(int32_t milliseconds);
+
 ===============================================================================
 ERROR CODES
 
@@ -71,6 +76,7 @@ IC_CONCURRENCY_OK               0
 IC_CONCURRENCY_NULLREF          1
 IC_CONCURRENCY_FAILURE          2
 IC_CONCURRENCY_ALREADY_JOINED   3
+IC_CONCURRENCY_ALREADY_LOCKED   4
 
 ===============================================================================
 */
@@ -90,7 +96,7 @@ IC_CONCURRENCY_ALREADY_JOINED   3
 #define IC_CONCURRENCY_NULLREF          1
 #define IC_CONCURRENCY_FAILURE          2
 #define IC_CONCURRENCY_ALREADY_JOINED   3
-
+#define IC_CONCURRENCY_ALREADY_LOCKED   4
 /*==============================================================================
   THREAD BACKEND
 ==============================================================================*/
@@ -163,114 +169,116 @@ IC_STATIC_ASSERT(sizeof(ic_atomic_i32) == sizeof(int32_t), "ic_atomic_i32 must b
 /*==============================================================================
   ATOMIC API
 ==============================================================================*/
-IC_HEADER_FUNC int ic_atomic_init(ic_atomic_i32* obj, int32_t value)
+IC_HEADER_FUNC int ic_atomic_init(ic_atomic_i32* const out_atom, const int32_t value)
 {
-    if (!obj)
+    if (!out_atom)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_init: obj is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_init: out_atom is null");
         return IC_CONCURRENCY_NULLREF;
     }
 
 #if defined(IC_ATOMIC_C11)
-    atomic_init(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    atomic_init(&out_atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_MSVC)
-    obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE = value;
+    out_atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE = value;
 
 #elif defined(IC_ATOMIC_GCC)
-    obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE = value;
+    out_atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE = value;
 
 #endif
 
     return IC_CONCURRENCY_OK;
 }
 
-IC_HEADER_FUNC ic_atomic_i32 ic_make_atomic(int32_t value)
+IC_HEADER_FUNC ic_atomic_i32 ic_make_atomic(const int32_t value)
 {
     ic_atomic_i32 atomic;
-    ic_atomic_init(&atomic, value);
+    (void)ic_atomic_init(&atomic, value);
     return atomic;
 }
 
-IC_HEADER_FUNC int32_t ic_atomic_load(ic_atomic_i32* obj)
+IC_HEADER_FUNC int32_t ic_atomic_load(const ic_atomic_i32* const atom)
 {
-    if (!obj)
+    if (!atom)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_load: obj is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_load: atom is null");
         return 0;
     }
 
 #if defined(IC_ATOMIC_C11)
-    return atomic_load(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE);
+    return atomic_load(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE);
 
 #elif defined(IC_ATOMIC_MSVC)
-    return InterlockedCompareExchange(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, 0, 0);
+    // InterlockedCompareExchange is not const-correct.
+    // Casts away const, but does NOT modify the value (safe).
+    return InterlockedCompareExchange((volatile LONG*)(void*)(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE), 0, 0);
 
 #elif defined(IC_ATOMIC_GCC)
-    return __atomic_load_n(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, __ATOMIC_SEQ_CST);
+    return __atomic_load_n(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, __ATOMIC_SEQ_CST);
 
 #endif
 }
 
-IC_HEADER_FUNC void ic_atomic_store(ic_atomic_i32* obj, int32_t value)
+IC_HEADER_FUNC void ic_atomic_store(ic_atomic_i32* const atom, const int32_t value)
 {
-    if (!obj)
+    if (!atom)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_store: obj is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_store: atom is null");
         return;
     }
 
 #if defined(IC_ATOMIC_C11)
-    atomic_store(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    atomic_store(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_MSVC)
-    InterlockedExchange(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    InterlockedExchange(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_GCC)
-    __atomic_store_n(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
 
 #endif
 }
 
-IC_HEADER_FUNC int32_t ic_atomic_fetch_add(ic_atomic_i32* obj, int32_t value)
+IC_HEADER_FUNC int32_t ic_atomic_fetch_add(ic_atomic_i32* const atom, const int32_t value)
 {
-    if (!obj)
+    if (!atom)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_fetch_add: obj is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_fetch_add: atom is null");
         return 0;
     }
 
 #if defined(IC_ATOMIC_C11)
-    return atomic_fetch_add(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    return atomic_fetch_add(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_MSVC)
-    return InterlockedExchangeAdd(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    return InterlockedExchangeAdd(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_GCC)
-    return __atomic_fetch_add(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
+    return __atomic_fetch_add(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
 
 #endif
 }
 
-IC_HEADER_FUNC int32_t ic_atomic_exchange(ic_atomic_i32* obj, int32_t value)
+IC_HEADER_FUNC int32_t ic_atomic_exchange(ic_atomic_i32* const atom, const int32_t value)
 {
-    if (!obj)
+    if (!atom)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_exchange: obj is null");
-        return INT32_MIN;
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_atomic_exchange: atom is null");
+        return 0;
     }
 
 #if defined(IC_ATOMIC_C11)
 
-    return atomic_exchange(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    return atomic_exchange(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_MSVC)
 
-    return InterlockedExchange(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
+    return InterlockedExchange(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value);
 
 #elif defined(IC_ATOMIC_GCC)
 
-    return __atomic_exchange_n(&obj->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
+    return __atomic_exchange_n(&atom->UNSAFE_PRIVATE_ACCESS_STATE_VALUE, value, __ATOMIC_SEQ_CST);
 
 #endif
 }
@@ -360,43 +368,43 @@ IC_HEADER_FUNC DWORD WINAPI ic_task_trampoline(LPVOID arg)
   TASK API
 ==============================================================================*/
 
-IC_HEADER_FUNC int ic_task_init(ic_task* t, ic_task_function func, void* arg)
+IC_HEADER_FUNC int ic_task_init(ic_task* const out_t, const ic_task_function func, void* const arg)
 {
-    if (!t || !func)
+    if (!out_t || !func)
     {
         return IC_CONCURRENCY_NULLREF;
     }
 
-    t->UNSAFE_PRIVATE_ACCESS_FUNCTION = func;
-    t->UNSAFE_PRIVATE_ACCESS_ARGUMENT = arg;
-    t->UNSAFE_PRIVATE_ACCESS_RESULT = 0;
+    out_t->UNSAFE_PRIVATE_ACCESS_FUNCTION = func;
+    out_t->UNSAFE_PRIVATE_ACCESS_ARGUMENT = arg;
+    out_t->UNSAFE_PRIVATE_ACCESS_RESULT = 0;
 
-    ic_atomic_init(&t->UNSAFE_PRIVATE_ACCESS_IS_RUNNING, 0);
-    ic_atomic_init(&t->UNSAFE_PRIVATE_ACCESS_IS_JOINED, 0);
+    ic_atomic_init(&out_t->UNSAFE_PRIVATE_ACCESS_IS_RUNNING, 0);
+    ic_atomic_init(&out_t->UNSAFE_PRIVATE_ACCESS_IS_JOINED, 0);
 
 #if defined(IC_THREAD_C11)
 
-    if (thrd_create(&t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE,
-                    ic_task_trampoline, t) != thrd_success)
+    if (thrd_create(&out_t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE,
+                    ic_task_trampoline, out_t) != thrd_success)
     {
         return IC_CONCURRENCY_FAILURE;
     }
 
 #elif defined(IC_THREAD_PTHREAD)
 
-    if (pthread_create(&t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE,
-                       NULL, ic_task_trampoline, t) != 0)
+    if (pthread_create(&out_t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE,
+                       NULL, ic_task_trampoline, out_t) != 0)
     {
         return IC_CONCURRENCY_FAILURE;
     }
 
 #elif defined(IC_THREAD_WIN)
 
-    t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE =
-        CreateThread(NULL, 0, ic_task_trampoline, t, 0,
-                     &t->UNSAFE_PRIVATE_ACCESS_THREAD_ID);
+    out_t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE =
+        CreateThread(NULL, 0, ic_task_trampoline, out_t, 0,
+                     &out_t->UNSAFE_PRIVATE_ACCESS_THREAD_ID);
 
-    if (!t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE)
+    if (!out_t->UNSAFE_PRIVATE_ACCESS_THREAD_HANDLE)
     {
         return IC_CONCURRENCY_FAILURE;
     }
@@ -406,7 +414,7 @@ IC_HEADER_FUNC int ic_task_init(ic_task* t, ic_task_function func, void* arg)
     return IC_CONCURRENCY_OK;
 }
 
-IC_HEADER_FUNC int ic_task_join(ic_task* t)
+IC_HEADER_FUNC int ic_task_join(ic_task* const t)
 {
     if (!t)
     {
@@ -446,7 +454,7 @@ IC_HEADER_FUNC int ic_task_join(ic_task* t)
     return IC_CONCURRENCY_OK;
 }
 
-IC_HEADER_FUNC int ic_task_is_running(ic_task* t)
+IC_HEADER_FUNC int ic_task_is_running(const ic_task* const t)
 {
     if (!t)
     {
@@ -457,11 +465,11 @@ IC_HEADER_FUNC int ic_task_is_running(ic_task* t)
     return ic_atomic_load(&t->UNSAFE_PRIVATE_ACCESS_IS_RUNNING);
 }
 
-IC_HEADER_FUNC int ic_task_get_result(ic_task* t, int* result_out)
+IC_HEADER_FUNC int ic_task_get_result(const ic_task* const t, int* const out_result)
 {
-    if (!t || !result_out)
+    if (!t || !out_result)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_task_get_result: t or result_out is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_task_get_result: t or out_result is null");
         return IC_CONCURRENCY_NULLREF;
     }
 
@@ -470,7 +478,7 @@ IC_HEADER_FUNC int ic_task_get_result(ic_task* t, int* result_out)
         return IC_CONCURRENCY_FAILURE;
     }
 
-    *result_out = t->UNSAFE_PRIVATE_ACCESS_RESULT;
+    *out_result = t->UNSAFE_PRIVATE_ACCESS_RESULT;
     return IC_CONCURRENCY_OK;
 }
 
@@ -497,38 +505,38 @@ typedef struct ic_mutex {
   MUTEX API
 ==============================================================================*/
 
-IC_HEADER_FUNC int ic_mutex_init(ic_mutex* m)
+IC_HEADER_FUNC int ic_mutex_init(ic_mutex* const out_m)
 {
-    if (!m)
+    if (!out_m)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("ic_mutex_init: m is null");
+        IC_CONCURRENCY_NULLPTR_PANIC("ic_mutex_init: out_m is null");
         return IC_CONCURRENCY_NULLREF;
     }
 
 #if defined(IC_THREAD_C11)
 
-    if (mtx_init(&m->UNSAFE_PRIVATE_ACCESS_MUTEX, mtx_plain) != thrd_success)
+    if (mtx_init(&out_m->UNSAFE_PRIVATE_ACCESS_MUTEX, mtx_plain) != thrd_success)
     {
         return IC_CONCURRENCY_FAILURE;
     }
 
 #elif defined(IC_THREAD_PTHREAD)
 
-    if (pthread_mutex_init(&m->UNSAFE_PRIVATE_ACCESS_MUTEX, NULL) != 0)
+    if (pthread_mutex_init(&out_m->UNSAFE_PRIVATE_ACCESS_MUTEX, NULL) != 0)
     {
         return IC_CONCURRENCY_FAILURE;
     }
 
 #elif defined(IC_THREAD_WIN)
 
-    InitializeSRWLock(&m->UNSAFE_PRIVATE_ACCESS_MUTEX);
+    InitializeSRWLock(&out_m->UNSAFE_PRIVATE_ACCESS_MUTEX);
 
 #endif
 
     return IC_CONCURRENCY_OK;
 }
 
-IC_HEADER_FUNC void ic_mutex_lock(ic_mutex* m)
+IC_HEADER_FUNC void ic_mutex_lock(ic_mutex* const m)
 {
     if (!m)
     {
@@ -551,7 +559,7 @@ IC_HEADER_FUNC void ic_mutex_lock(ic_mutex* m)
 #endif
 }
 
-IC_HEADER_FUNC int ic_mutex_trylock(ic_mutex* m)
+IC_HEADER_FUNC int ic_mutex_trylock(ic_mutex* const m)
 {
     if (!m)
     {
@@ -563,21 +571,21 @@ IC_HEADER_FUNC int ic_mutex_trylock(ic_mutex* m)
 
     if (mtx_trylock(&m->UNSAFE_PRIVATE_ACCESS_MUTEX) != thrd_success)
     {
-        return IC_CONCURRENCY_FAILURE;
+        return IC_CONCURRENCY_ALREADY_LOCKED;
     }
 
 #elif defined(IC_THREAD_PTHREAD)
 
     if (pthread_mutex_trylock(&m->UNSAFE_PRIVATE_ACCESS_MUTEX) != 0)
     {
-        return IC_CONCURRENCY_FAILURE;
+        return IC_CONCURRENCY_ALREADY_LOCKED;
     }
 
 #elif defined(IC_THREAD_WIN)
 
     if (!TryAcquireSRWLockExclusive(&m->UNSAFE_PRIVATE_ACCESS_MUTEX))
     {
-        return IC_CONCURRENCY_FAILURE;
+        return IC_CONCURRENCY_ALREADY_LOCKED;
     }
 
 #endif
@@ -585,7 +593,7 @@ IC_HEADER_FUNC int ic_mutex_trylock(ic_mutex* m)
     return IC_CONCURRENCY_OK;
 }
 
-IC_HEADER_FUNC void ic_mutex_unlock(ic_mutex* m)
+IC_HEADER_FUNC void ic_mutex_unlock(ic_mutex* const m)
 {
     if (!m)
     {
@@ -602,7 +610,7 @@ IC_HEADER_FUNC void ic_mutex_unlock(ic_mutex* m)
 #endif
 }
 
-IC_HEADER_FUNC int ic_mutex_destroy(ic_mutex* m)
+IC_HEADER_FUNC int ic_mutex_destroy(ic_mutex* const m)
 {
     if (!m)
     {
@@ -623,9 +631,44 @@ IC_HEADER_FUNC int ic_mutex_destroy(ic_mutex* m)
         mutex_result = IC_CONCURRENCY_FAILURE;
     }
 
+#elif defined(IC_THREAD_WIN)
+    // No destroy required for SRWLOCK (kernel-managed, no state teardown)
+
 #endif
 
     return mutex_result;
+}
+
+/*##############################################################################
+  THREAD SLEEP
+##############################################################################*/
+
+IC_HEADER_FUNC void ic_thread_sleep(const int32_t milliseconds)
+{
+    if (milliseconds <= 0)
+    {
+        return; // safe no-op
+    }
+
+#if defined(IC_THREAD_C11)
+
+    struct timespec ts;
+    ts.tv_sec  = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000;
+    thrd_sleep(&ts, NULL);
+
+#elif defined(IC_THREAD_PTHREAD)
+
+    struct timespec ts;
+    ts.tv_sec  = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+
+#elif defined(IC_THREAD_WIN)
+
+    Sleep((DWORD)milliseconds);
+
+#endif
 }
 
 #endif /* IC_CONCURRENCY_H */

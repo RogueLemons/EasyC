@@ -72,8 +72,18 @@ int main(void) {
         IHC_TEST_ENTRY(verify_try_macro_propagates_error_in_same_error_type_context),
         // ic_concurrency.h
         IHC_TEST_ENTRY(verify_atomic_int_can_get_and_set_values_correctly),
+        IHC_TEST_ENTRY(verify_atomic_does_not_crash_when_given_nullptr),
+        IHC_TEST_ENTRY(verify_atomic_int_can_handle_full_32_bit_range),
         IHC_TEST_ENTRY(verify_task_can_run_and_join_thread),
+        IHC_TEST_ENTRY(verify_task_does_not_crash_when_given_nullptr),
         IHC_TEST_ENTRY(verify_mutex_can_be_locked_and_unlocked),
+        IHC_TEST_ENTRY(verify_mutex_does_not_crash_when_given_nullptr),
+        IHC_TEST_ENTRY(verify_atomic_is_thread_safe_under_contention),
+        IHC_TEST_ENTRY(verify_mutex_prevents_race_conditions),
+        IHC_TEST_ENTRY(verify_task_cannot_be_joined_twice),
+        IHC_TEST_ENTRY(verify_get_result_fails_if_task_running),
+        IHC_TEST_ENTRY(verify_memory_visibility_with_atomics),
+        IHC_TEST_ENTRY(verify_mutex_trylock_fails_under_contention),
     };
 
     IHC_RUN(iron_c_lib_tests);
