@@ -41,33 +41,34 @@ By default, it does nothing, but you can set it to log an error, abort the progr
 ATOMICS
 ----------------------------------------
 struct ic_atomic_i32;
-ic_atomic_i32 ic_make_atomic(int32_t value);                // Theoretically safer: int ic_atomic_init(ic_atomic_i32* obj, int32_t value);
-int32_t ic_atomic_load(ic_atomic_i32* obj);
-void ic_atomic_store(ic_atomic_i32* obj, int32_t value);
-int32_t ic_atomic_fetch_add(ic_atomic_i32* obj, int32_t value);
-int32_t ic_atomic_exchange(ic_atomic_i32* obj, int32_t value);
+ic_atomic_i32 ic_make_atomic(const int32_t value);
+    Theoretically safer that ic_make_atomic: int ic_atomic_init(ic_atomic_i32* const out_atom, const int32_t value);
+int32_t ic_atomic_load(const ic_atomic_i32* const atom);
+void ic_atomic_store(ic_atomic_i32* const atom, const int32_t value);
+int32_t ic_atomic_fetch_add(ic_atomic_i32* const atom, const int32_t value);
+int32_t ic_atomic_exchange(ic_atomic_i32* const atom, const int32_t value);
 
 TASKS
 ----------------------------------------
 struct ic_task;
 typedef int (*ic_task_function)(void* arg);
-int ic_task_init(ic_task* t, ic_task_function func, void* arg);
-int ic_task_is_running(ic_task* t);
-int ic_task_get_result(ic_task* t, int* out_result);
-int ic_task_join(ic_task* t);
+int ic_task_init(ic_task* const out_t, const ic_task_function func, void* const arg);
+int ic_task_is_running(const ic_task* const t);
+int ic_task_get_result(const ic_task* const t, int* const out_result);
+int ic_task_join(ic_task* const t);
 
 THREAD LOCKS (MUTEXES)
 ----------------------------------------
 struct ic_mutex;
-int  ic_mutex_init(ic_mutex* m);
-void ic_mutex_lock(ic_mutex* m);
-int  ic_mutex_trylock(ic_mutex* m);
-void ic_mutex_unlock(ic_mutex* m);
-int  ic_mutex_destroy(ic_mutex* m);
+int  ic_mutex_init(ic_mutex* const out_m);
+void ic_mutex_lock(ic_mutex* const m);
+int  ic_mutex_trylock(ic_mutex* const m);
+void ic_mutex_unlock(ic_mutex* const m);
+int  ic_mutex_destroy(ic_mutex* const m);
 
 SLEEP
 ----------------------------------------
-void ic_thread_sleep(int32_t milliseconds);
+void ic_thread_sleep(const int32_t milliseconds);
 
 ===============================================================================
 ERROR CODES
@@ -89,17 +90,17 @@ IC_CONCURRENCY_ALREADY_LOCKED   4
     #define IC_CONCURRENCY_NULLPTR_PANIC(msg) ((void)0)
 #endif
 
-/*==============================================================================
-  ERROR CODES
-==============================================================================*/
+// ==============================================================================
+//  ERROR CODES
+// ==============================================================================
 #define IC_CONCURRENCY_OK               0
 #define IC_CONCURRENCY_NULLREF          1
 #define IC_CONCURRENCY_FAILURE          2
 #define IC_CONCURRENCY_ALREADY_JOINED   3
 #define IC_CONCURRENCY_ALREADY_LOCKED   4
-/*==============================================================================
-  THREAD BACKEND
-==============================================================================*/
+// ==============================================================================
+//  THREAD BACKEND
+// ==============================================================================
 #if defined(IC_USE_C11_THREADS_AND_ATOMICS)
 
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
@@ -128,9 +129,9 @@ IC_CONCURRENCY_ALREADY_LOCKED   4
 
 #endif
 
-/*##############################################################################
-  ATOMICS
-##############################################################################*/
+// ##############################################################################
+//  ATOMICS
+// ##############################################################################
 
 #if defined(IC_USE_C11_THREADS_AND_ATOMICS) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(_MSC_VER)
 
@@ -166,9 +167,9 @@ IC_CONCURRENCY_ALREADY_LOCKED   4
 
 IC_STATIC_ASSERT(sizeof(ic_atomic_i32) == sizeof(int32_t), "ic_atomic_i32 must be the same size as int32_t");
 
-/*==============================================================================
-  ATOMIC API
-==============================================================================*/
+// ==============================================================================
+//  ATOMIC API
+// ==============================================================================
 IC_HEADER_FUNC int ic_atomic_init(ic_atomic_i32* const out_atom, const int32_t value)
 {
     if (!out_atom)
@@ -283,9 +284,9 @@ IC_HEADER_FUNC int32_t ic_atomic_exchange(ic_atomic_i32* const atom, const int32
 #endif
 }
 
-/*##############################################################################
-  TASK SYSTEM
-##############################################################################*/
+// ==============================================================================
+//  TASK SYSTEM
+// ==============================================================================
 
 typedef int (*ic_task_function)(void* arg);
 
@@ -312,9 +313,9 @@ typedef struct ic_task {
 
 } ic_task;
 
-/*==============================================================================
-  TASK TRAMPOLINES
-==============================================================================*/
+// ==============================================================================
+//  TASK TRAMPOLINES
+// ==============================================================================
 
 #if defined(IC_THREAD_C11)
 IC_HEADER_FUNC int ic_task_trampoline(void* arg)
@@ -364,9 +365,9 @@ IC_HEADER_FUNC DWORD WINAPI ic_task_trampoline(LPVOID arg)
 }
 #endif
 
-/*==============================================================================
-  TASK API
-==============================================================================*/
+// ==============================================================================
+//  TASK API
+// ==============================================================================
 
 IC_HEADER_FUNC int ic_task_init(ic_task* const out_t, const ic_task_function func, void* const arg)
 {
@@ -482,9 +483,9 @@ IC_HEADER_FUNC int ic_task_get_result(const ic_task* const t, int* const out_res
     return IC_CONCURRENCY_OK;
 }
 
-/*##############################################################################
-  LOCK SYSTEM
-##############################################################################*/
+// ==============================================================================
+//  LOCK SYSTEM
+// ==============================================================================
 
 typedef struct ic_mutex {
 
@@ -501,9 +502,9 @@ typedef struct ic_mutex {
 
 } ic_mutex;
 
-/*==============================================================================
-  MUTEX API
-==============================================================================*/
+// ==============================================================================
+//  MUTEX API
+// ==============================================================================
 
 IC_HEADER_FUNC int ic_mutex_init(ic_mutex* const out_m)
 {
@@ -639,9 +640,9 @@ IC_HEADER_FUNC int ic_mutex_destroy(ic_mutex* const m)
     return mutex_result;
 }
 
-/*##############################################################################
-  THREAD SLEEP
-##############################################################################*/
+// ==============================================================================
+//  THREAD SLEEP
+// ==============================================================================
 
 IC_HEADER_FUNC void ic_thread_sleep(const int32_t milliseconds)
 {
@@ -671,4 +672,4 @@ IC_HEADER_FUNC void ic_thread_sleep(const int32_t milliseconds)
 #endif
 }
 
-#endif /* IC_CONCURRENCY_H */
+#endif // IC_CONCURRENCY_H
