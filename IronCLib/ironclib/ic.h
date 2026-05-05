@@ -11,5 +11,6 @@
 #include "ic_typenum.h"
 #include "ic_result.h"
 #include "ic_opaque_storage.h"
+#include "ic_concurrency.h"
 
 #endif // IRON_C_FULL_H
