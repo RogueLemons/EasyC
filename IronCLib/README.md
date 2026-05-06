@@ -243,6 +243,7 @@ All headers are verified against:
 All configurations above are verified on Windows x86_64.
 
 # TODO
-- Add ic_concurrency section to header library documentation
+- Add using in your system section for ic_concurrency
+- Fix quote dash before names
 - Test on Linux platform as well
 - Add C++ compatability guards?

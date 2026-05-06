@@ -16,6 +16,7 @@ The library uses macros in three ways: 1) provide small, necessary, and practica
   * [ic_memory.h](#ic_memoryh)
   * [ic_bounded_loop.h](#ic_bounded_looph)
   * [ic_num_cast.h](#ic_num_casth)
+  * [ic_concurrency.h](#ic_concurrencyh)
 * [Using in your system](#using-in-your-system)
 
 ## ic.h
@@ -529,5 +530,189 @@ static inline int32_t cast_uint32_t_to_int32_t(const uint32_t v)
 }
 ```
 
+## ic_concurrency.h
+A small, portable concurrency abstraction layer for C, providing atomics, threads (tasks), mutexes, and sleep functionality.
+
+It provides:
+- `ic_atomic_i32` for safe atomic 32-bit integer operations
+- `ic_task` for portable thread creation and management
+- `ic_mutex` for mutual exclusion
+- `ic_thread_sleep` for cross-platform thread sleeping
+
+The API is designed to be minimal and predictable while hiding platform-specific threading details (C11, pthreads, or Windows).
+
+### Why use this?
+It exists because concurrency in C is highly platform-dependent and inconsistent across compilers and operating systems. This abstraction makes it possible to write multi-threaded code using a single, unified API while preserving explicit control over behavior, with light safety features such as null checks and controlled state handling. This results in more portable, easier-to-reason-about concurrency code without introducing heavy frameworks or runtime dependencies.
+
+### Example
+
+#### Run parallel work
+This example shows how to run a worker function twice in parallel while incrementing a shared atomic counter, which ensures the work is done ten times across both threads. 
+
+```c
+#include "ironclib/ic_concurrency.h"
+
+static int worker(void* arg)
+{
+    ic_atomic_i32* counter = (ic_atomic_i32*)arg;
+
+    int32_t i = ic_atomic_fetch_add(counter, 1);
+    while (i < 10)
+    {
+        // Do work for this "slot"
+
+        i = ic_atomic_fetch_add(counter, 1);
+    }
+
+    return 0;
+}
+
+int run_two_workers_in_parallel()
+{
+    ic_atomic_i32 counter = ic_make_atomic(0);
+
+    ic_task task;
+    if (ic_task_init(&task, worker, &counter) != IC_CONCURRENCY_OK)
+    {
+        return 1;
+    }
+
+    (void)worker(&counter); 
+    // this thread and task's thread run this in parallel
+    // while safely incrementing counter
+
+    if (ic_task_join(&task) != IC_CONCURRENCY_OK)
+    {
+        return 2;
+    }
+
+    const int32_t result = ic_atomic_load(&counter);
+    // result == 10
+
+    return 0;
+}
+```
+
+> *Note: Work distribution between threads is not guaranteed. One thread may perform more iterations than the other, but the total work will still be 10 for this example.*
+
+#### Set up module mutex for critical work
+This example shows how to set up a mutex private to a module, and use it for a critical section of work.
+
+```c
+// critical_worker.h
+int set_up_critical_worker(void);
+int clean_up_critical_worker(void);
+int perform_critical_work(void);
+
+// critical_worker.c
+#include "critical_worker.h"
+#include "ironclib/ic_concurrency.h"
+
+static ic_mutex critical_mutex;
+static int critical_module_is_initialized = 0;
+
+int set_up_critical_worker(void)
+{
+    if (critical_module_is_initialized)
+    {
+        return 2;
+    }
+
+    if (ic_mutex_init(&critical_mutex) != IC_CONCURRENCY_OK)
+    {
+        return 1;
+    }
+
+    critical_module_is_initialized = 1;
+    return 0;
+}
+
+int clean_up_critical_worker(void)
+{
+    if (!critical_module_is_initialized)
+    {
+        return 2;
+    }
+
+    if (ic_mutex_destroy(&critical_mutex) != IC_CONCURRENCY_OK)
+    {
+        return 1;
+    }
+
+    critical_module_is_initialized = 0;
+    return 0;
+}
+
+int perform_critical_work(void)
+{
+    if (!critical_module_is_initialized)
+    {
+        return 2;
+    }
+
+    int result = 0;
+
+    ic_mutex_lock(&critical_mutex);
+
+    // Critical section:
+    // Only one thread executes this at a time.
+
+    ic_mutex_unlock(&critical_mutex);
+
+    return result;
+}
+```
+
+In this example, the idea is for **a single thread** to perform the setup and cleanup each once, at the start and end of the program, respectively. After that the `perform_critical_work` function can be called as many times as desired for the duration of the program.
+
+> *Note: `ic_mutex` is non-recursive. Locking a non-recursive mutex twice from the same thread will deadlock in most underlying implementations.*
+
+#### Sleep
+A simple sleep function. It makes no guarantee for exact of sleep, but it is portable and always takes an int32_t argument as milliseconds to ensure same behavior across platforms and check for less-than-zero.
+
+```c
+#include "ironclib/ic_concurrency.h"
+
+const int32_t five_seconds = 5 * 1000;
+ic_thread_sleep(five_seconds);
+```
+
+#### More documentation in header itself
+The [ic_concurrency.h file](../ironclib/ic_concurrency.h) contains a larger API than most other headers in this library. All headers included commented documentation directly in the library headers but this one is extra worthwhile to have a look at.
+
+### Conceptual Expansion
+
+`ic_atomic_i32` maps to:
+- C11 `_Atomic` when available  
+- GCC/Clang `__atomic` builtins  
+- MSVC `Interlocked` operations  
+
+`ic_task` wraps:
+- `thrd_t` (C11)  
+- `pthread_t` (POSIX)  
+- `HANDLE` (Windows)  
+
+`ic_mutex` wraps:
+- `mtx_t` (C11)  
+- `pthread_mutex_t` (POSIX)  
+- `SRWLOCK` (Windows)  
+
+`ic_thread_sleep` maps to:
+- `thrd_sleep` (C11)  
+- `nanosleep` (POSIX)  
+- `Sleep` (Windows)  
+
+This ensures consistent behavior across platforms while keeping the implementation header-only.
+
+### What NOT to do
+- Do not lock mutex twice in same thread (will in practice almost always lead to deadlock).
+- Do not access UNSAFE_PRIVATE_ACCESS_* fields directly; they are internal and may change.
+- Do not call ic_task_join multiple times on the same task.
+- Do not use atomics as a replacement for mutexes when coordinating complex shared state.
+- Do not ignore return codes from initialization and threading functions.
+- Do not assume thread scheduling or execution order; always design for concurrency correctness.
+
 ## Using in your system
 For more reading on how to use this library in your application, [go here](using_in_your_system.md).
+
+> *Note: All headers contain documentation as comments. For more reading, look directly into the files.*
