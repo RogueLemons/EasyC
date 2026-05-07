@@ -9,6 +9,7 @@ The following sections include topics for using IronCLib in a code base. This is
 * [Create one entrypoint for memory allocation](#create-one-entrypoint-for-memory-allocation)
 * [Write with rules for structs and opaque storage](#write-with-rules-for-structs-and-opaque-storage)
 * [Make it your own](#make-it-your-own)
+* [Decouple from library and make a thread pool](#decouple-from-library-and-make-a-thread-pool)
 * [What NOT to do](#what-not-to-do)
 
 ## Create a standardized, type-safe error system
@@ -562,6 +563,117 @@ FUNCTION_END(Object_cleanup(&obj))
 > *Note: Congratulations on noticing that the reterr macro is not MSVC-compatible in its current form. Consider the rewrite necessary for a port that does not have __typeof__.*
 
 It may be tempting to build increasingly powerful macro abstractions, but doing so often shifts complexity from runtime behavior into compile-time structure, which can make debugging and onboarding significantly harder. As with all abstractions, the trade-off should be explicit and deliberate. Every rule, abstraction, or non-standard principle introduces a form of debt that must be accounted for later, so care should be taken to avoid introducing too many competing concepts.
+
+## Decouple from library and make a thread pool
+This section discusses how to decouple from the IronC implementation of concurrency (which is of course an outlandish idea!), incorporate the previously mentioned global error system, and build a simple thread pool system. 
+
+### Why use this?
+By wrapping `ic_concurrency` behind an application-specific API and global error system, the codebase is decoupled from the underlying concurrency implementation, allowing it to be replaced or modified without affecting higher-level systems. A consistent error model is enforced across the application and can be included in this wrapping. 
+
+Thread pools primarily improve performance by reusing a fixed set of threads instead of repeatedly creating and destroying them, which reduces overhead and improves throughput under load. They also provide a controlled way to schedule and execute work, limiting concurrency and making system behavior more predictable and easier to manage at scale.
+
+### Premade
+A header is [provided here](premade/parallel_work.h) that has already wrapped the concurrency implementation. It also contains a thread pool implementation.
+
+### Convert to Error
+Begin by writing a function that translates integer results into the global errors.
+
+```c
+#include "ironclib/ic_inline.h"
+#include "global_error.h"
+
+IC_HEADER_FUNC Error concurrency_result_to_error(const int concurrency_result)
+{
+    switch (concurrency_result)
+    {
+        case IC_CONCURRENCY_OK: return Error_NoError;
+        case IC_CONCURRENCY_NULLREF: return Error_NullRef;
+        case IC_CONCURRENCY_FAILURE: return Error_Runtime;
+        case IC_CONCURRENCY_ALREADY_JOINED: return Error_InvalidState;
+        case IC_CONCURRENCY_ALREADY_LOCKED: return Error_InvalidState;
+        default: return Error_Unknown;
+    }
+}
+```
+
+### Wrap concurrency parts
+Add typedefs for the IronC concurrency types (or even wrap them in structs), then wrap the underlying library functions.
+
+```c
+#include "ironclib/ic_concurrency.h"
+
+// MUTEX API
+typedef ic_mutex Mutex;
+IC_HEADER_FUNC Error mutex_init(Mutex* const out_mutex) { return concurrency_result_to_error(ic_mutex_init(out_mutex)); }
+IC_HEADER_FUNC Error mutex_trylock(Mutex* const mutex) { return concurrency_result_to_error(ic_mutex_trylock(mutex)); }
+```
+
+> *Note: Do not wrap concurrency types in result types, as this will require disciplined knowledge of concurrency and the implementation of e.g. atomics, mutexes, and threads for all supported, and future supported, platforms.*
+
+### Add portable condition variable
+This part is optional, and a thread pool can be implemented with simple sleep function calls. Perhaps the reduced complexity is worth it if the thread pool is expected to be working constantly. However, here is a portable condition variable implementation, which will be used in the thread pool. 
+
+```c
+// This is only the C11 implementation.
+// The premade file also contains pthread and windows implementations.
+
+typedef struct ConditionVariable { cnd_t UNSAFE_PRIVATE_ACCESS_COND; } ConditionVariable;
+
+IC_HEADER_FUNC Error condition_variable_init(ConditionVariable* const cv)
+{
+    if (!cv)
+    {
+        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_init");
+        return Error_NullRef;
+    }
+
+    return (cnd_init(&cv->UNSAFE_PRIVATE_ACCESS_COND) == thrd_success)
+        ? Error_NoError
+        : Error_Runtime;
+}
+
+IC_HEADER_FUNC Error condition_variable_notify_one(ConditionVariable* const cv)
+{
+    if (!cv)
+    {
+        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_notify_one");
+        return Error_NullRef;
+    }
+
+    cnd_signal(&cv->UNSAFE_PRIVATE_ACCESS_COND);
+    return Error_NoError;
+}
+
+IC_HEADER_FUNC Error condition_variable_notify_all(ConditionVariable* const cv)
+{
+    if (!cv)
+    {
+        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_notify_all");
+        return Error_NullRef;
+    }
+
+    cnd_broadcast(&cv->UNSAFE_PRIVATE_ACCESS_COND);
+    return Error_NoError;
+}
+
+IC_HEADER_FUNC Error condition_variable_wait(ConditionVariable* const cv, Mutex* const m)
+{
+    if (!cv || !m)
+    {
+        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_wait");
+        return Error_NullRef;
+    }
+
+    return (cnd_wait(&cv->UNSAFE_PRIVATE_ACCESS_COND, &m->UNSAFE_PRIVATE_ACCESS_MUTEX) == thrd_success)
+        ? Error_NoError
+        : Error_Runtime;
+}
+```
+
+> *Note: `condition_variable_wait` actually commits the sin of accessing the underlying mutex of the wrapper. It is a limitation of IronC since it does not try to be an all-encompassing-portability library. At least the underlying members of `ConditionVariable` and `Mutex` have names that "look dangerous" which triggers a coder to be fully aware of what is being done.*
+
+### Implement thread pool
+Last but not least is the implementation of the thread pool. 
 
 ## What NOT to do
 - Do not mix raw C implementation patterns (malloc, enums, structs) with IronCLib abstractions within the same architectural layer; each layer should follow a single, consistent paradigm. Once IronCLib is used within a module, it should be applied consistently. Ownership, data flow, and error handling should follow a unified convention throughout that module.

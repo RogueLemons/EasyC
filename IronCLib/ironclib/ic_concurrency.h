@@ -42,7 +42,7 @@ ATOMICS
 ----------------------------------------
 struct ic_atomic_i32;
 ic_atomic_i32 ic_make_atomic(const int32_t value);
-    Theoretically safer that ic_make_atomic: int ic_atomic_init(ic_atomic_i32* const out_atom, const int32_t value);
+    Theoretically safer than ic_make_atomic: int ic_atomic_init(ic_atomic_i32* const out_atom, const int32_t value);
 int32_t ic_atomic_load(const ic_atomic_i32* const atom);
 void ic_atomic_store(ic_atomic_i32* const atom, const int32_t value);
 int32_t ic_atomic_fetch_add(ic_atomic_i32* const atom, const int32_t value);
