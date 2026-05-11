@@ -261,7 +261,5 @@ All configurations above are verified on Windows x86_64.
 
 # 
 - Add CoJobs
-- Add using in your system section for ic_concurrency
-- Fix quote dash before names
 - Test on Linux platform as well
 - Add C++ compatability guards?
