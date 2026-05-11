@@ -84,6 +84,7 @@ IC_CONCURRENCY_ALREADY_LOCKED   4
 
 #include "ic_inline.h"
 #include "ic_static_assert.h"
+#include "ic_concurrency_backend.h"
 #include <stdint.h>
 
 #ifndef IC_CONCURRENCY_NULLPTR_PANIC
@@ -98,72 +99,21 @@ IC_CONCURRENCY_ALREADY_LOCKED   4
 #define IC_CONCURRENCY_FAILURE          2
 #define IC_CONCURRENCY_ALREADY_JOINED   3
 #define IC_CONCURRENCY_ALREADY_LOCKED   4
-// ==============================================================================
-//  THREAD BACKEND
-// ==============================================================================
-#if defined(IC_USE_C11_THREADS_AND_ATOMICS)
-
-    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-        #include <threads.h>
-        #define IC_THREAD_C11
-    #else
-        #error "IC_CONCURRENCY ERROR: IC_USE_C11_THREADS_AND_ATOMICS requires a C11 compiler."
-    #endif
-
-
-#elif defined(_WIN32)
-
-    #define IC_THREAD_WIN
-    #include <Windows.h>
-
-
-#elif defined(__unix__) || defined(__APPLE__)
-
-    #define IC_THREAD_PTHREAD
-    #include <pthread.h>
-
-
-#else
-
-    #error "IC_CONCURRENCY ERROR: No supported threading backend (Win / pthread / optional C11)."
-
-#endif
 
 // ##############################################################################
 //  ATOMICS
 // ##############################################################################
 
-#if defined(IC_USE_C11_THREADS_AND_ATOMICS) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(_MSC_VER)
-
-    #define IC_ATOMIC_C11
-    #include <stdatomic.h>
-
-    typedef struct ic_atomic_i32 {
-        _Atomic int32_t UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
-    } ic_atomic_i32;
-
-#elif defined(__GNUC__) || defined(__clang__)
-
-    #define IC_ATOMIC_GCC
-
-    typedef struct ic_atomic_i32 {
-        int32_t UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
-    } ic_atomic_i32;
-
-#elif defined(_MSC_VER)
-
-    #define IC_ATOMIC_MSVC
-    #include <Windows.h>
-
-    typedef struct ic_atomic_i32 {
-        volatile LONG UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
-    } ic_atomic_i32;
-
-#else
-
-    #error "IC_CONCURRENCY ERROR: No supported atomic backend (C11 atomics / GCC built-ins / MSVC Interlocked)."
-
+typedef struct ic_atomic_i32 
+{
+#if defined (IC_ATOMIC_C11)
+    _Atomic int32_t UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
+#elif defined(IC_ATOMIC_GCC)
+    int32_t UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
+#elif defined(IC_ATOMIC_MSVC)
+    volatile LONG UNSAFE_PRIVATE_ACCESS_STATE_VALUE;
 #endif
+} ic_atomic_i32;
 
 IC_STATIC_ASSERT(sizeof(ic_atomic_i32) == sizeof(int32_t), "ic_atomic_i32 must be the same size as int32_t");
 

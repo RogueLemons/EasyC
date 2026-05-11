@@ -62,14 +62,6 @@ Preferred for:
 -------------------------------------------------------------------------------
 */
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    #define IC_HEADER_FUNC static inline
-#elif defined(_MSC_VER)
-    #define IC_HEADER_FUNC static __inline
-#elif defined(__GNUC__) || defined(__clang__)
-    #define IC_HEADER_FUNC static __inline__
-#else
-    #define IC_HEADER_FUNC static
-#endif
+#define IC_HEADER_FUNC static IC_INLINE
 
 #endif // IC_INLINE_H

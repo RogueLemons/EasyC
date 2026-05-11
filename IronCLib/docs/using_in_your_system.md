@@ -564,6 +564,11 @@ FUNCTION_END(Object_cleanup(&obj))
 
 It may be tempting to build increasingly powerful macro abstractions, but doing so often shifts complexity from runtime behavior into compile-time structure, which can make debugging and onboarding significantly harder. As with all abstractions, the trade-off should be explicit and deliberate. Every rule, abstraction, or non-standard principle introduces a form of debt that must be accounted for later, so care should be taken to avoid introducing too many competing concepts.
 
+### Performance, inline, and namespace pollution
+It is important to remember that IronCLib is a header library, and even the premade files are header only. Efforts are made to give good performance and help compilers inline and optimize. However, it is the end user that is responsible for wrapping the functions of IronCLib if necessary, be it for performance reasons, decoupling from the library, or even avoiding namespace pollution. With that said, most inline functions in this library are very small, and any code unused by a code-generation macro is very likely to be thrown away by the compiler.
+
+> *Note: The future project SteelCLib will provide more flexibility for managing these concerns.*
+
 ## Decouple from library and make a thread pool
 This section discusses how to decouple from the IronC implementation of concurrency (which is of course an outlandish idea!), incorporate the previously mentioned global error system, and build a simple thread pool system. 
 
@@ -608,72 +613,139 @@ IC_HEADER_FUNC Error mutex_init(Mutex* const out_mutex) { return concurrency_res
 IC_HEADER_FUNC Error mutex_trylock(Mutex* const mutex) { return concurrency_result_to_error(ic_mutex_trylock(mutex)); }
 ```
 
-> *Note: Do not wrap concurrency types in result types, as this will require disciplined knowledge of concurrency and the implementation of e.g. atomics, mutexes, and threads for all supported, and future supported, platforms.*
+If the code-base uses result values then replacing `Error` with `VoidResult` is perfectly valid and can even work better in making the system feel more uniform (and will support the same try-propagation of errors).
 
-### Add portable condition variable
-This part is optional, and a thread pool can be implemented with simple sleep function calls. Perhaps the reduced complexity is worth it if the thread pool is expected to be working constantly. However, here is a portable condition variable implementation, which will be used in the thread pool. 
+> *Note: Do not wrap concurrency types in result types or opaque structs, as this will require disciplined knowledge of concurrency and the implementation of e.g. atomics, mutexes, and threads for all supported, and future supported, platforms.*
+
+### Implement thread pool
+A thread pool can be built on top of the wrapped concurrency API by combining a fixed set of worker threads, a shared work queue, a mutex, and a signaling primitive such as `Gate`. The important idea is that threads are created once during initialization and then continuously wait for work instead of repeatedly being created and destroyed.
+
+The provided implementation `TaskPool` uses a bounded ring-buffer queue protected by a mutex:
 
 ```c
-// This is only the C11 implementation.
-// The premade file also contains pthread and windows implementations.
-
-typedef struct ConditionVariable { cnd_t UNSAFE_PRIVATE_ACCESS_COND; } ConditionVariable;
-
-IC_HEADER_FUNC Error condition_variable_init(ConditionVariable* const cv)
+typedef struct TaskPool
 {
-    if (!cv)
-    {
-        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_init");
-        return Error_NullRef;
-    }
+    Task PRIVATE_workers[TASKPOOL_MAX_THREADS];
+    uint32_t PRIVATE_worker_count;
 
-    return (cnd_init(&cv->UNSAFE_PRIVATE_ACCESS_COND) == thrd_success)
-        ? Error_NoError
-        : Error_Runtime;
-}
+    Mutex PRIVATE_mutex;
+    Gate PRIVATE_work_gate;
 
-IC_HEADER_FUNC Error condition_variable_notify_one(ConditionVariable* const cv)
+    AtomicI32 PRIVATE_state;
+    AtomicI32 PRIVATE_active_jobs;
+
+    TaskPoolJob PRIVATE_jobs[TASKPOOL_MAX_PENDING_TASKS];
+
+    uint32_t PRIVATE_head;
+    uint32_t PRIVATE_tail;
+    uint32_t PRIVATE_count;
+
+} TaskPool;
+
+// API
+typedef struct TaskPool TaskPool;
+typedef void (*TaskPoolFunction)(void* arg);
+#define TASKPOOL_MAX_THREADS
+#define TASKPOOL_MAX_PENDING_TASKS
+Error task_pool_init(TaskPool* const out_pool, const uint32_t worker_count);
+Error task_pool_submit(TaskPool* const pool, const TaskPoolFunction func, void* const arg, TaskCompletion* const out_completion);
+Error task_pool_destroy(TaskPool* const pool);
+
+typedef struct TaskCompletion TaskCompletion;
+Error task_completion_wait(const TaskCompletion* const completion, const int32_t retry_period_ms, const int64_t timeout_ms);
+```
+
+> *Note: The only safe way to make an opaque struct containing concurrency objects is with forward declaration, heap memory allocation, and implementation in source file. If heap usage is of no concern then this is a good way to hide implementation details. Here however the prefix `PRIVATE_` is used so that if a user attempts to access the fields it will look like the wrong way to use the struct (which it is).*
+
+Tasks are submitted into the queue while holding the mutex:
+
+```c
+Error task_pool_submit(TaskPool* const pool, const TaskPoolFunction func, void* const arg, TaskCompletion* const out_completion)
 {
-    if (!cv)
+    mutex_lock(&pool->PRIVATE_mutex);
+
+    pool->PRIVATE_jobs[pool->PRIVATE_tail] = (TaskPoolJob)
     {
-        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_notify_one");
-        return Error_NullRef;
-    }
+        .PRIVATE_func = func,
+        .PRIVATE_arg = arg,
+        .PRIVATE_completion = out_completion
+    };
 
-    cnd_signal(&cv->UNSAFE_PRIVATE_ACCESS_COND);
-    return Error_NoError;
-}
+    pool->PRIVATE_tail = (pool->PRIVATE_tail + 1) % TASKPOOL_MAX_PENDING_TASKS;
+    pool->PRIVATE_count++;
 
-IC_HEADER_FUNC Error condition_variable_notify_all(ConditionVariable* const cv)
-{
-    if (!cv)
-    {
-        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_notify_all");
-        return Error_NullRef;
-    }
+    mutex_unlock(&pool->PRIVATE_mutex);
 
-    cnd_broadcast(&cv->UNSAFE_PRIVATE_ACCESS_COND);
-    return Error_NoError;
-}
-
-IC_HEADER_FUNC Error condition_variable_wait(ConditionVariable* const cv, Mutex* const m)
-{
-    if (!cv || !m)
-    {
-        IC_CONCURRENCY_NULLPTR_PANIC("condition_variable_wait");
-        return Error_NullRef;
-    }
-
-    return (cnd_wait(&cv->UNSAFE_PRIVATE_ACCESS_COND, &m->UNSAFE_PRIVATE_ACCESS_MUTEX) == thrd_success)
-        ? Error_NoError
-        : Error_Runtime;
+    return gate_signal_one(&pool->PRIVATE_work_gate);
 }
 ```
 
-> *Note: `condition_variable_wait` actually commits the sin of accessing the underlying mutex of the wrapper. It is a limitation of IronC since it does not try to be an all-encompassing-portability library. At least the underlying members of `ConditionVariable` and `Mutex` have names that "look dangerous" which triggers a coder to be fully aware of what is being done.*
+Worker threads spend most of their lifetime sleeping on the gate until work becomes available:
 
-### Implement thread pool
-Last but not least is the implementation of the thread pool. 
+```c
+while (1)
+{
+    if (!Error_eq(gate_wait(&p->PRIVATE_work_gate), Error_NoError))
+    {
+        continue;
+    }
+
+    mutex_lock(&p->PRIVATE_mutex);
+
+    if (p->PRIVATE_count == 0)
+    {
+        mutex_unlock(&p->PRIVATE_mutex);
+        continue;
+    }
+
+    TaskPoolJob job = p->PRIVATE_jobs[p->PRIVATE_head];
+
+    p->PRIVATE_head = (p->PRIVATE_head + 1) % TASKPOOL_MAX_PENDING_TASKS;
+    p->PRIVATE_count--;
+
+    mutex_unlock(&p->PRIVATE_mutex);
+
+    job.PRIVATE_func(job.PRIVATE_arg);
+}
+```
+
+The implementation also demonstrates useful higher-level behavior that applications often need, such as graceful draining, abort-style shutdown, bounded queues, completion tracking, timeout handling, and explicit lifecycle states. While the exact design will vary between projects, these ideas tend to form the foundation of practical thread pool systems.
+
+Why is this not part of the library? Because the library focuses on making C a safer language to use, not provide every possible utility. Everything in the `premade` is outside the scope of the project and are examples of what IronCLib can offer. There are also many trade-offs to consider for a thread pool. Using condition variables or atomics or sleeping the thread will all have their own pros and cons for CPU, memory, and complexity, depending on if the pool expects long or short lasting tasks, or how many. Each decision creates branching paths of more decisions and complexity. For example, how should memory ownership of task arguments work? If the user should be allowed to know when the work is finished, how should the user be alerted? If via a boolean atomic, what is best method to not waste CPU and time when polling it? If via condition variable, should one be used to signal all task results or one condition variable per thread? 
+
+Managing multiple threads is not the easiest aspect of coding, yet this library has made an attempt to make it easier to do safely with clear APIs, with portability, and documentation. The `TaskPool` being discussed is also tested in [concurrency_signal_test.h](../ironhammerc/tests/concurrency_signal_test.h) in the test suite. 
+
+### Merging gates and broadcasts
+For the future, it can be worthwhile to create wrapper of `ic_condition_variable` that merges the behavior of `ic_gate` and `ic_broadcast`. These two structs and their functions where made with safety and ease of use in mind, as well as being as lightweight as possible for this *header* library, but an event type that can both signal_one AND signal_all could definitely have use.
+
+What is important to understand is that the gate and broadcast interfaces exist because condition variables do not have any state nor can they remember the past, so the gate and broadcast help manage this. But merging them requires a clear understanding of concurrency and a clear definition of desired behavior. What needs does the application have (e.g. ordered or unordered queue?) and how would the implementation differ from what professionals expect of event-type APIs? With that said, here is an idea for an API.
+
+```c
+#include "ironclib/ic_typenum.h"
+#include "ironclib/ic_concurrency.h"
+#include "ironclib/ic_concurrency_signal.h"
+
+#define PASSPOINT_MODE_LIST(X, Type) \
+    X(Type, Gated, 0, "One-at-a-time passing, counting permits") \
+    X(Type, Open, 1, "All automatic immediate pass, no permit counting")
+IC_TYPENUM_FULL(PasspointMode, uint8_t, USE_MODE_LIST)
+
+typedef struct Passpoint {
+    ConditionVariable cv;
+    Mutex mtx;
+    PasspointMode mode;
+    uint32_t permits;   // Only counted in GATED mode, neither increase nor decrease in OPEN mode
+} Passpoint;
+
+Error passpoint_init(Passpoint* out_p);
+Error passpoint_destroy(Passpoint* p);
+Error passpoint_get_mode(Passpoint* p, PasspointMode* out_mode);
+
+Error passpoint_wait(Passpoint* p);
+Error passpoint_signal_one(Passpoint* p);           // GATED: increments permit count, wakes one waiter; OPEN: no-op)
+Error passpoint_open_and_signal_all(Passpoint* p);  // GATED: wakes all and switches to OPEN (sticky); OPEN: no-op
+Error passpoint_set_gated(Passpoint* p);            // OPEN: Switch back to GATED mode (sticky), permits = 0; GATED: no-op
+```
 
 ## What NOT to do
 - Do not mix raw C implementation patterns (malloc, enums, structs) with IronCLib abstractions within the same architectural layer; each layer should follow a single, consistent paradigm. Once IronCLib is used within a module, it should be applied consistently. Ownership, data flow, and error handling should follow a unified convention throughout that module.

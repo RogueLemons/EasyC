@@ -68,7 +68,14 @@ USAGE:
     X(Type, RaceCondition, 30, "Race condition detected") \
     \
     /* Internal fallback */ \
-    X(Type, InternalError, 31, "Internal application error")
+    X(Type, InternalError, 31, "Internal application error") \
+    X(Type, NotImplemented, 32, "Feature not implemented yet") \
+    \
+    /* Critical */ \
+    X(Type, Critical, 33, "Critical error occurred") \
+    X(Type, Irrecoverable, 34, "Cannot recover from error") \
+    X(Type, Panic, 35, "Unrecoverable error - application should abort")
+    
 
 // Generate a global error type with the provided list
 IC_TYPENUM_FULL(Error, int, GLOBAL_ERROR_LIST)

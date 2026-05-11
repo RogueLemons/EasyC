@@ -539,6 +539,10 @@ It provides:
 - `ic_mutex` for mutual exclusion
 - `ic_thread_sleep` for cross-platform thread sleeping
 
+`ic_concurrency_signal.h` provides:
+- `ic_condition_variable` for thread coordination via wait/notify semantics, blocking without CPU usage while waiting
+- `ic_signal` for simpler wait/notify usage
+
 The API is designed to be minimal and predictable while hiding platform-specific threading details (C11, pthreads, or Windows).
 
 ### Why use this?
@@ -677,12 +681,179 @@ const int32_t five_seconds = 5 * 1000;
 ic_thread_sleep(five_seconds);
 ```
 
+#### Trigger and react to signals
+The library provides two layers for signal-style synchronization:
+
+At the lowest level, `ic_condition_variable` is a direct wrapper over platform condition variables. It is powerful but requires **manual coordination with a mutex and careful signaling discipline**, which makes it easy to misuse in real applications.
+
+```c
+#include "ironclib/ic_concurrency_signal.h"
+
+ic_mutex m;
+ic_condition_variable cv;
+int ready = 0;
+
+ic_mutex_lock(&m);
+while (!ready)
+{
+    ic_condition_variable_wait(&cv, &m);
+}
+ic_mutex_unlock(&m);
+```
+
+For higher-level usage, the library provides lightweight `ic_gate` and `ic_broadcast`, which wraps a mutex + condition variable + internal state into a safe signal abstraction designed specifically for signaling patterns. They are used for signaling one waiting thread and many waiting threads, respectively.
+
+```c
+#include <stdio.h>
+#include "ironclib/ic_concurrency.h"
+#include "ironclib/ic_concurrency_signal.h"
+
+static ic_gate gate;
+
+int worker(void* arg)
+{
+    int id = *(int*)arg;
+
+    printf("Worker %d waiting...\n", id);
+
+    // Wait until gate opens
+    ic_gate_wait(&gate);
+
+    printf("Worker %d passed through gate\n", id);
+
+    return 0;
+}
+
+int main(void)
+{
+    if (ic_gate_init(&gate) != IC_CONCURRENCY_OK)
+    {
+        return 1;
+    }
+
+    int ids[3] = { 1, 2, 3 };
+
+    ic_task tasks[3];
+
+    // Start 3 waiting workers
+    for (int i = 0; i < 3; i++)
+    {
+        if (ic_task_init(&tasks[i], worker, &ids[i]) != IC_CONCURRENCY_OK)
+        {
+            return 2;
+        }
+    }
+
+    ic_thread_sleep(500);
+
+    printf("Signal #1\n");
+    ic_gate_signal_one(&gate);
+
+    ic_thread_sleep(500);
+
+    printf("Signal #2\n");
+    ic_gate_signal_one(&gate);
+
+    ic_thread_sleep(500);
+
+    printf("Signal #3\n");
+    ic_gate_signal_one(&gate);
+
+    // Join all workers
+    for (int i = 0; i < 3; i++)
+    {
+        ic_task_join(&tasks[i]);
+    }
+
+    ic_gate_destroy(&gate);
+
+    return 0;
+}
+```
+
+The order of woken up tasks waiting on an `ic_gate` is arbitrary. Worker 2 can be woken by Signal 1 for instance. The gate is also lossless, meaning that signals sent ahead of time are stored as permits for future waiting threads to immediately continue.
+
+> *Note: The internal notification logic of signals might break if `UINT32_MAX` threads are waiting on same gate.*
+
+```c
+#include <stdio.h>
+#include "ironclib/ic_concurrency.h"
+#include "ironclib/ic_concurrency_signal.h"
+
+static ic_broadcast broadcast;
+
+int worker(void* arg)
+{
+    int id = *(int*)arg;
+
+    printf("Worker %d waiting for broadcast...\n", id);
+
+    // Wait until broadcast is signaled
+    ic_broadcast_wait(&broadcast);
+
+    printf("Worker %d received broadcast\n", id);
+
+    return 0;
+}
+
+int main(void)
+{
+    // Initialize broadcast
+    if (ic_broadcast_init(&broadcast) != IC_CONCURRENCY_OK)
+    {
+        return 1;
+    }
+
+    int ids[3] = { 1, 2, 3 };
+
+    ic_task tasks[3];
+
+    // Start waiting workers
+    for (int i = 0; i < 3; i++)
+    {
+        if (ic_task_init(&tasks[i], worker, &ids[i]) != IC_CONCURRENCY_OK)
+        {
+            return 2;
+        }
+    }
+
+    ic_thread_sleep(1000);
+
+    printf("Broadcasting signal...\n");
+
+    // Wake ALL waiting workers
+    if (ic_broadcast_signal_all(&broadcast) != IC_CONCURRENCY_OK)
+    {
+        return 3;
+    }
+
+    // Join all workers
+    for (int i = 0; i < 3; i++)
+    {
+        if (ic_task_join(&tasks[i]) != IC_CONCURRENCY_OK)
+        {
+            return 4;
+        }
+    }
+
+    // Cleanup
+    if (ic_broadcast_destroy(&broadcast) != IC_CONCURRENCY_OK)
+    {
+        return 5;
+    }
+
+    return 0;
+}
+```
+
+The broadcast signals all waiting threads and will let all future waiting threads pass immediately until the broadcast is manually reset with `ic_broadcast_reset`. It does not guarantee any ordering.
+
 #### More documentation in header itself
-The [ic_concurrency.h file](../ironclib/ic_concurrency.h) contains a larger API than most other headers in this library. All headers included commented documentation directly in the library headers but this one is extra worthwhile to have a look at.
+The [ic_concurrency.h file](../ironclib/ic_concurrency.h) and [ic_concurrency_signal.h files](../ironclib/ic_concurrency.h) contain a larger API than most other headers in this library. All headers included commented documentation directly in the library headers but this one is extra worthwhile to have a look at.
 
 ### Conceptual Expansion
 
-`ic_atomic_i32` maps to:
+`ic_atomic_i32` wraps:
 - C11 `_Atomic` when available  
 - GCC/Clang `__atomic` builtins  
 - MSVC `Interlocked` operations  
@@ -697,10 +868,19 @@ The [ic_concurrency.h file](../ironclib/ic_concurrency.h) contains a larger API 
 - `pthread_mutex_t` (POSIX)  
 - `SRWLOCK` (Windows)  
 
-`ic_thread_sleep` maps to:
+`ic_thread_sleep` wraps:
 - `thrd_sleep` (C11)  
 - `nanosleep` (POSIX)  
 - `Sleep` (Windows)  
+
+`ic_condition_variable` wraps:
+- `cnd_t` (C11)
+- `pthread_cond_t` (POSIX)
+- `CONDITION_VARIABLE` (Windows)
+
+`ic_gate` and `ic_broadcast` wrap:
+- `ic_mutex` and
+- `ic_condition_variable`
 
 This ensures consistent behavior across platforms while keeping the implementation header-only.
 

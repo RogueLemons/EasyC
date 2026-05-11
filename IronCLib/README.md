@@ -170,6 +170,23 @@ int foo()
 }
 ```
 
+#### Wait for signals
+Lightweight and easy-to-use system for waiting on signals without using CPU (even for sleep).
+
+```c
+#include "ironclib/ic_concurrency_signal"
+
+// Thread 1A
+ic_gate_wait(&gate);
+// Thread 2A
+ic_gate_signal_one(&gate);
+
+// Thread 1B
+ic_broadcast_wait(&broadcast);
+// Thread 2B
+ic_broadcast_signal_all(&broadcast);
+```
+
 ## Library Overview
 IronCLib is split into small, independent headers. You can use any part on its own - but they are designed to be adopted gradually based on your needs.
 
@@ -188,7 +205,7 @@ Helpful tools that solve specific problems but don’t require architectural cha
 - `ic_bounded_loop.h`
 - `ic_typenum.h`
 - `ic_num_cast.h`
-- `ic_concurrency.h`
+- `ic_concurrency.h` and `ic_concurrency_signal.h`
 
 ### Architectural patterns (adopt deliberately)
 These introduce stronger design patterns and are most effective when used consistently across a module or project.
@@ -242,7 +259,8 @@ All headers are verified against:
 
 All configurations above are verified on Windows x86_64.
 
-# TODO
+# 
+- Add CoJobs
 - Add using in your system section for ic_concurrency
 - Fix quote dash before names
 - Test on Linux platform as well

@@ -7,6 +7,9 @@ do { \
     printf("\n"); \
 } while (0)
 
+// Set to 1 to enable stress tests, which can be time-consuming; 0 to disable them for quicker runs
+#define RUN_STRESS_TESTS 0
+
 // Includes
 #include <stdio.h>
 #include "ic_hammer.h"
@@ -21,6 +24,7 @@ do { \
 #include "tests/opaque_storage_test.h"
 #include "tests/result_test.h"
 #include "tests/concurrency_test.h"
+#include "tests/concurrency_signal_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -84,6 +88,42 @@ int main(void) {
         IHC_TEST_ENTRY(verify_get_result_fails_if_task_running),
         IHC_TEST_ENTRY(verify_memory_visibility_with_atomics),
         IHC_TEST_ENTRY(verify_mutex_trylock_fails_under_contention),
+        // ic_concurrency_signal.h
+        IHC_TEST_ENTRY(verify_condition_variable_can_signal_waiting_thread),
+        IHC_TEST_ENTRY(verify_condition_variable_notify_all_wakes_all_waiters),
+        IHC_TEST_ENTRY(verify_condition_variable_does_not_crash_when_given_nullptr),
+        IHC_TEST_ENTRY(verify_condition_variable_wait_rechecks_predicate),
+        IHC_TEST_ENTRY(verify_gate_nullptr_safety),
+        IHC_TEST_ENTRY(verify_gate_releases_exactly_one_thread_per_signal),
+        IHC_TEST_ENTRY(verify_gate_is_lossless),
+        IHC_TEST_ENTRY(verify_broadcast_nullptr_safety),
+        IHC_TEST_ENTRY(verify_broadcast_wakes_all_waiters),
+        IHC_TEST_ENTRY(verify_broadcast_is_sticky_until_reset),
+        IHC_TEST_ENTRY(verify_broadcast_reset_blocks_new_waiters),
+        #if RUN_STRESS_TESTS
+        IHC_TEST_ENTRY(stress_gate_interleave_deterministic),
+        IHC_TEST_ENTRY(stress_gate_signal_before_wait_deterministic),
+        IHC_TEST_ENTRY(stress_gate_consumes_permits_correctly),
+        IHC_TEST_ENTRY(stress_broadcast_deterministic_signal_reset_interleave),
+        IHC_TEST_ENTRY(stress_broadcast_signal_before_wait_deterministic),
+        IHC_TEST_ENTRY(stress_broadcast_reset_reblocks_waiters),
+        #endif
+        IHC_TEST_ENTRY(verify_task_pool_executes_all_tasks_with_completion),
+        IHC_TEST_ENTRY(verify_task_pool_fire_and_forget_executes_tasks),
+        IHC_TEST_ENTRY(verify_task_pool_processes_tasks_consistently),
+        IHC_TEST_ENTRY(verify_task_pool_rejects_null_arguments),
+        IHC_TEST_ENTRY(verify_task_completion_wait_times_out_and_resolves),
+        IHC_TEST_ENTRY(verify_task_pool_close_state_transitions),
+        IHC_TEST_ENTRY(verify_task_pool_close_drain_completes_all_tasks),
+        IHC_TEST_ENTRY(verify_task_pool_close_abort_drops_queued_tasks),
+        IHC_TEST_ENTRY(verify_task_pool_reaches_timeout_for_blocking_tasks),
+        IHC_TEST_ENTRY(verify_task_pool_can_safely_be_destroyed_without_manually_closing),
+        IHC_TEST_ENTRY(verify_task_pool_can_fill_up_and_safely_reject_excess_tasks),
+        #if RUN_STRESS_TESTS
+        IHC_TEST_ENTRY(stress_task_pool_handles_high_contention_submissions),
+        IHC_TEST_ENTRY(stress_task_pool_survives_shutdown_submission_races),
+        IHC_TEST_ENTRY(stress_task_pool_survives_repeated_lifecycle_cycles)
+        #endif
     };
 
     IHC_RUN(iron_c_lib_tests);
