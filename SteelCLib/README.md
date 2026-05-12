@@ -17,3 +17,4 @@ An upcoming project and expansion of IronCLib that offers more flexibility at a 
 - Make typenum generated functions use pointers (only if starting to allow non-integer internal types, maybe for SteelC)?
 - Add tests that can be verified on multiple compilers
 - Rename project to IronC (because it is rigid and not using it can cause code to break) with SteelC as name of expanded version (more flexible), and then call the parser WorkshopC because it helps create strong-like-metal C 
+- Expand the IronC co_job system to generate linear co_jobs with macros that take maximum size for scheduler and job as arguments, and introduce dynamic co_jobs where the steps set an out argument for next step (no set -> NULL -> job done)
