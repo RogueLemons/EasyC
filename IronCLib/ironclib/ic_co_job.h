@@ -55,8 +55,8 @@ typedef void (*ic_co_step)(void* data);
 
 typedef struct ic_co_job
 {
-    ic_co_step steps[IC_CO_MAX_STEPS];
-    int step_count;
+    ic_co_step UNSAFE_PRIVATE_ACCESS_steps[IC_CO_MAX_STEPS];
+    int UNSAFE_PRIVATE_ACCESS_step_count;
 
 } ic_co_job;
 
@@ -77,14 +77,14 @@ typedef struct PRIVATE_ic_co_scheduled_job
 
 typedef struct ic_co_scheduler
 {
-    PRIVATE_ic_co_scheduled_job jobs[IC_CO_MAX_JOBS];
-    int job_count;
+    PRIVATE_ic_co_scheduled_job UNSAFE_PRIVATE_ACCESS_jobs[IC_CO_MAX_JOBS];
+    int UNSAFE_PRIVATE_ACCESS_job_count;
 
-    PRIVATE_ic_co_scheduled_job* runnable[IC_CO_MAX_JOBS];
-    int runnable_count;
+    PRIVATE_ic_co_scheduled_job* UNSAFE_PRIVATE_ACCESS_runnable[IC_CO_MAX_JOBS];
+    int UNSAFE_PRIVATE_ACCESS_runnable_count;
 
-    int total_credits;
-    unsigned char is_done; // dirty portable bool
+    int UNSAFE_PRIVATE_ACCESS_total_credits;
+    unsigned char UNSAFE_PRIVATE_ACCESS_is_done; // dirty portable bool
 
 } ic_co_scheduler;
 
@@ -150,13 +150,13 @@ IC_HEADER_FUNC ic_co_job ic_make_co_job(void)
 
 IC_HEADER_FUNC void ic_co_job_add_step(ic_co_job* const job, const ic_co_step step)
 {
-    if ((job == NULL) || (job->step_count >= IC_CO_MAX_STEPS) || (step == NULL))
+    if ((job == NULL) || (job->UNSAFE_PRIVATE_ACCESS_step_count >= IC_CO_MAX_STEPS) || (step == NULL))
     {
         IC_CO_BAD_CALL_CAPTURE("ic_co_job_add_step", NULL, job, step, -1, -1);
         return;
     }
 
-    job->steps[job->step_count++] = step;
+    job->UNSAFE_PRIVATE_ACCESS_steps[job->UNSAFE_PRIVATE_ACCESS_step_count++] = step;
 }
 
 IC_HEADER_FUNC void ic_co_job_run(const ic_co_job* const job, void* const data)
@@ -166,18 +166,18 @@ IC_HEADER_FUNC void ic_co_job_run(const ic_co_job* const job, void* const data)
         IC_CO_BAD_CALL_CAPTURE("ic_co_job_run", NULL, job, NULL, -1, -1);
         return;
     }
-    for (int i = 0; i < job->step_count; i++)
+    for (int i = 0; i < job->UNSAFE_PRIVATE_ACCESS_step_count; i++)
     {
-        if (job->steps[i] == NULL)
+        if (job->UNSAFE_PRIVATE_ACCESS_steps[i] == NULL)
         {
             IC_CO_BAD_CALL_CAPTURE("ic_co_job_run, NULL job step", NULL, job, NULL, -1, -1);
             return;
         }
     }
 
-    for (int i = 0; i < job->step_count; i++)
+    for (int i = 0; i < job->UNSAFE_PRIVATE_ACCESS_step_count; i++)
     {
-        job->steps[i](data);
+        job->UNSAFE_PRIVATE_ACCESS_steps[i](data);
     }
 }
 
@@ -186,27 +186,27 @@ IC_HEADER_FUNC void ic_co_job_run(const ic_co_job* const job, void* const data)
 IC_HEADER_FUNC ic_co_scheduler ic_make_co_scheduler(void)
 {
     ic_co_scheduler s = {0};
-    s.is_done = 1;
+    s.UNSAFE_PRIVATE_ACCESS_is_done = 1;
     return s;
 }
 
 IC_HEADER_FUNC void ic_co_scheduler_add_job(ic_co_scheduler* const s, const ic_co_job* const job, void* const data, const int priority, const int weight)
 {
-    if ((s == NULL) || (s->job_count >= IC_CO_MAX_JOBS) || (job == NULL) || (job->step_count <= 0) || (priority < 0) || (weight <= 0) || (weight > IC_CO_MAX_STEPS))
+    if ((s == NULL) || (s->UNSAFE_PRIVATE_ACCESS_job_count >= IC_CO_MAX_JOBS) || (job == NULL) || (job->UNSAFE_PRIVATE_ACCESS_step_count <= 0) || (priority < 0) || (weight <= 0) || (weight > IC_CO_MAX_STEPS))
     {
         IC_CO_BAD_CALL_CAPTURE("ic_co_scheduler_add_job", s, job, NULL, priority, weight);
         return;
     }
-    for (int i = 0; i < job->step_count; i++)
+    for (int i = 0; i < job->UNSAFE_PRIVATE_ACCESS_step_count; i++)
     {
-        if (job->steps[i] == NULL)
+        if (job->UNSAFE_PRIVATE_ACCESS_steps[i] == NULL)
         {
             IC_CO_BAD_CALL_CAPTURE("ic_co_scheduler_add_job, NULL job step", s, job, NULL, priority, weight);
             return;
         }
     }
 
-    PRIVATE_ic_co_scheduled_job* const j = &s->jobs[s->job_count++];
+    PRIVATE_ic_co_scheduled_job* const j = &s->UNSAFE_PRIVATE_ACCESS_jobs[s->UNSAFE_PRIVATE_ACCESS_job_count++];
 
     j->job = job;
     j->data = data;
@@ -218,7 +218,7 @@ IC_HEADER_FUNC void ic_co_scheduler_add_job(ic_co_scheduler* const s, const ic_c
 
     j->credits = 0;
 
-    s->is_done = 0;
+    s->UNSAFE_PRIVATE_ACCESS_is_done = 0;
 }
 
 IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
@@ -231,16 +231,16 @@ IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
     }
 
     // rebuild runnable list and refill credits
-    if (s->total_credits <= 0)
+    if (s->UNSAFE_PRIVATE_ACCESS_total_credits <= 0)
     {
-        s->total_credits = 0;
-        s->runnable_count = 0;
+        s->UNSAFE_PRIVATE_ACCESS_total_credits = 0;
+        s->UNSAFE_PRIVATE_ACCESS_runnable_count = 0;
 
-        for (int i = 0; i < s->job_count; i++)
+        for (int i = 0; i < s->UNSAFE_PRIVATE_ACCESS_job_count; i++)
         {
-            PRIVATE_ic_co_scheduled_job* const j = &s->jobs[i];
+            PRIVATE_ic_co_scheduled_job* const j = &s->UNSAFE_PRIVATE_ACCESS_jobs[i];
 
-            const int remaining = j->job->step_count - j->state;
+            const int remaining = j->job->UNSAFE_PRIVATE_ACCESS_step_count - j->state;
 
             if (remaining <= 0)
             {
@@ -250,17 +250,17 @@ IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
             const int granted = (j->weight < remaining) ? j->weight : remaining;
 
             j->credits = granted;
-            s->total_credits += granted;
-            s->runnable[s->runnable_count++] = j;
+            s->UNSAFE_PRIVATE_ACCESS_total_credits += granted;
+            s->UNSAFE_PRIVATE_ACCESS_runnable[s->UNSAFE_PRIVATE_ACCESS_runnable_count++] = j;
         }
     }
 
     // Set next job by score
     PRIVATE_ic_co_scheduled_job* j = NULL;
     int best_score = -1; // auto updated to first element when j == NULL
-    for (int i = 0; i < s->runnable_count; i++)
+    for (int i = 0; i < s->UNSAFE_PRIVATE_ACCESS_runnable_count; i++)
     {
-        PRIVATE_ic_co_scheduled_job* job = s->runnable[i];
+        PRIVATE_ic_co_scheduled_job* job = s->UNSAFE_PRIVATE_ACCESS_runnable[i];
 
         if (job->credits <= 0)
         {
@@ -279,16 +279,16 @@ IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
     // If no job selected then all jobs are done
     if (j == NULL)
     {
-        s->is_done = 1;
+        s->UNSAFE_PRIVATE_ACCESS_is_done = 1;
         return;
     }
 
     // Run this step of the job
-    j->job->steps[j->state](j->data);
+    j->job->UNSAFE_PRIVATE_ACCESS_steps[j->state](j->data);
 
     j->state++;
     j->credits--;
-    s->total_credits--;
+    s->UNSAFE_PRIVATE_ACCESS_total_credits--;
 
     // remove from runnable immediately if finished
     // if (j->state >= j->job->step_count)
@@ -313,7 +313,7 @@ IC_HEADER_FUNC int ic_co_scheduler_is_done(const ic_co_scheduler* const s)
         return 1;
     }
 
-    return (int)s->is_done;
+    return (int)s->UNSAFE_PRIVATE_ACCESS_is_done;
 }
 
 IC_HEADER_FUNC int ic_co_scheduler_job_count(const ic_co_scheduler* const s)
@@ -324,7 +324,7 @@ IC_HEADER_FUNC int ic_co_scheduler_job_count(const ic_co_scheduler* const s)
         return 0;
     }
 
-    return s->job_count;
+    return s->UNSAFE_PRIVATE_ACCESS_job_count;
 }
 
 IC_HEADER_FUNC int ic_co_scheduler_credits(const ic_co_scheduler* const s)
@@ -335,7 +335,7 @@ IC_HEADER_FUNC int ic_co_scheduler_credits(const ic_co_scheduler* const s)
         return 0;
     }
 
-    return s->total_credits;
+    return s->UNSAFE_PRIVATE_ACCESS_total_credits;
 }
 
 
