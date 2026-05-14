@@ -64,15 +64,12 @@ typedef struct ic_co_job
 typedef struct PRIVATE_ic_co_scheduled_job
 {
     const ic_co_job* job;
-
     void* data;
 
     int state;
-    unsigned char finished;  // dirty portable bool
 
     int priority;
     int weight;
-
     int credits;
 
 } PRIVATE_ic_co_scheduled_job;
@@ -83,8 +80,10 @@ typedef struct ic_co_scheduler
     PRIVATE_ic_co_scheduled_job jobs[IC_CO_MAX_JOBS];
     int job_count;
 
-    int total_credits;
+    PRIVATE_ic_co_scheduled_job* runnable[IC_CO_MAX_JOBS];
+    int runnable_count;
 
+    int total_credits;
     unsigned char is_done; // dirty portable bool
 
 } ic_co_scheduler;
@@ -162,7 +161,7 @@ IC_HEADER_FUNC void ic_co_job_add_step(ic_co_job* const job, const ic_co_step st
 
 IC_HEADER_FUNC void ic_co_job_run(const ic_co_job* const job, void* const data)
 {
-    if (!job)
+    if (job == NULL)
     {
         IC_CO_BAD_CALL_CAPTURE("ic_co_job_run", NULL, job, NULL, -1, -1);
         return;
@@ -187,8 +186,6 @@ IC_HEADER_FUNC void ic_co_job_run(const ic_co_job* const job, void* const data)
 IC_HEADER_FUNC ic_co_scheduler ic_make_co_scheduler(void)
 {
     ic_co_scheduler s = {0};
-    // s.job_count = 0;
-    // s.total_credits = 0;
     s.is_done = 1;
     return s;
 }
@@ -215,7 +212,6 @@ IC_HEADER_FUNC void ic_co_scheduler_add_job(ic_co_scheduler* const s, const ic_c
     j->data = data;
 
     j->state = 0;
-    j->finished = 0;
 
     j->priority = priority;
     j->weight = weight;
@@ -234,43 +230,39 @@ IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
         return;
     }
 
-    // Refill credits if needed
+    // rebuild runnable list and refill credits
     if (s->total_credits <= 0)
     {
         s->total_credits = 0;
-        
+        s->runnable_count = 0;
+
         for (int i = 0; i < s->job_count; i++)
         {
-            PRIVATE_ic_co_scheduled_job* j = &s->jobs[i];
-            
-            if (j->finished)
-            {
-                continue;
-            }
-            
+            PRIVATE_ic_co_scheduled_job* const j = &s->jobs[i];
+
             const int remaining = j->job->step_count - j->state;
-            
+
             if (remaining <= 0)
             {
-                j->finished = 1;
                 continue;
             }
-            
+
             const int granted = (j->weight < remaining) ? j->weight : remaining;
-            
+
             j->credits = granted;
             s->total_credits += granted;
+            s->runnable[s->runnable_count++] = j;
         }
     }
 
     // Set next job by score
     PRIVATE_ic_co_scheduled_job* j = NULL;
-    int best_score = -1; // no compare for j == NULL
-    for (int i = 0; i < s->job_count; i++)
+    int best_score = -1; // auto updated to first element when j == NULL
+    for (int i = 0; i < s->runnable_count; i++)
     {
-        PRIVATE_ic_co_scheduled_job* job = &s->jobs[i];
+        PRIVATE_ic_co_scheduled_job* job = s->runnable[i];
 
-        if (job->finished || job->credits <= 0)
+        if (job->credits <= 0)
         {
             continue;
         }
@@ -298,10 +290,19 @@ IC_HEADER_FUNC void ic_co_scheduler_tick(ic_co_scheduler* const s)
     j->credits--;
     s->total_credits--;
 
-    if (j->state >= j->job->step_count)
-    {
-        j->finished = 1;
-    }
+    // remove from runnable immediately if finished
+    // if (j->state >= j->job->step_count)
+    // {
+    //     for (int i = 0; i < s->runnable_count; i++)
+    //     {
+    //         if (s->runnable[i] == j)
+    //         {
+    //             s->runnable[i] = s->runnable[s->runnable_count - 1];
+    //             s->runnable_count--;
+    //             break;
+    //         }
+    //     }
+    // }
 }
 
 IC_HEADER_FUNC int ic_co_scheduler_is_done(const ic_co_scheduler* const s)
