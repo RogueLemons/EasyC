@@ -25,6 +25,7 @@ do { \
 #include "tests/result_test.h"
 #include "tests/concurrency_test.h"
 #include "tests/concurrency_signal_test.h"
+#include "tests/co_job_test.h"
 
 IC_STATIC_ASSERT(8 == 2 * 4, "A simple verification that the static assert macro works correctly");
 
@@ -124,6 +125,23 @@ int main(void) {
         IHC_TEST_ENTRY(stress_task_pool_survives_shutdown_submission_races),
         IHC_TEST_ENTRY(stress_task_pool_survives_repeated_lifecycle_cycles)
         #endif
+        // ic_co_job.h
+        IHC_TEST_ENTRY(verify_co_job_add_detects_nullptr_and_too_many_steps),
+        IHC_TEST_ENTRY(verify_co_job_runs_correct_number_of_steps),
+        IHC_TEST_ENTRY(verify_data_transfer_in_job_run),
+        IHC_TEST_ENTRY(verify_co_scheduler_initial_getter_values),
+        IHC_TEST_ENTRY(verify_co_scheduler_getters_detects_null),
+        IHC_TEST_ENTRY(verify_co_scheduler_updates_done_status_after_job_entry),
+        IHC_TEST_ENTRY(verify_co_scheduler_add_detects_nullptr_and_too_many_jobs),
+        IHC_TEST_ENTRY(verify_co_scheduler_rejects_empty_job),
+        IHC_TEST_ENTRY(verify_co_scheduler_rejects_bad_arguments),
+        IHC_TEST_ENTRY(verify_premade_jobs_hidden_in_source_files_can_be_run),
+        IHC_TEST_ENTRY(verify_job_setup_can_be_done_in_source_file),
+        IHC_TEST_ENTRY(verify_scheduler_tick_detects_nullptr),
+        IHC_TEST_ENTRY(verify_scheduler_correctlty_ticks_and_runs_one_job),
+        IHC_TEST_ENTRY(verify_scheduler_prioritizes_steps_by_priority),
+        IHC_TEST_ENTRY(verify_scheduler_runs_steps_in_order_for_weighted_jobs),
+        IHC_TEST_ENTRY(verify_scheduler_interleaves_jobs_with_default_scoring_system),
     };
 
     IHC_RUN(iron_c_lib_tests);

@@ -773,8 +773,6 @@ int main(void)
 
 The order of woken up tasks waiting on an `ic_gate` is arbitrary. Worker 2 can be woken by Signal 1 for instance. The gate is also lossless, meaning that signals sent ahead of time are stored as permits for future waiting threads to immediately continue.
 
-> *Note: The internal notification logic of signals might break if `UINT32_MAX` threads are waiting on same gate.*
-
 ```c
 #include <stdio.h>
 #include "ironclib/ic_concurrency.h"

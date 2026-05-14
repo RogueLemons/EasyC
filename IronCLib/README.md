@@ -259,7 +259,7 @@ All headers are verified against:
 
 All configurations above are verified on Windows x86_64.
 
-# 
-- Add CoJobs
+# TODO
+- Add CoJobs (make array of runnable jobs for performance with many jobs)
 - Test on Linux platform as well
 - Add C++ compatability guards?
