@@ -130,8 +130,10 @@ Matrix4x4Result res = mat4_inverse(&m);
 if (!res.ok) { /* handle error */ }
 ```
 
-### Multi-threading
-Standardized interface to create and manage threads across platforms. Comes with tasks (threads), mutexes, atomics, and a thread sleep.
+### Multithreading and Cooperative Jobs
+Standardized interface to create and manage threads across platforms. Comes with tasks (threads), mutexes, atomics, and a thread sleep. 
+
+Also includes a lightweight cooperative job system for single-threaded step-based scheduling (coroutines-style, no OS threads).
 
 #### Atomic integers
 IronC provides one portable atomic 32-bit integer, safely set and accessed across threads.
@@ -187,6 +189,23 @@ ic_broadcast_wait(&broadcast);
 ic_broadcast_signal_all(&broadcast);
 ```
 
+#### Cooperative jobs and scheduling
+Lightweight cooperative multitasking for single-threaded systems. Define jobs as ordered steps and schedule them incrementally with configurable priorities and execution weights.
+
+```c
+#include "ironclib/ic_co_job.h"
+
+ic_co_scheduler sched = ic_make_co_scheduler();
+
+ic_co_job job = IC_MAKE_CO_JOB(load_func, process_func, save_func);
+ic_co_scheduler_add_job(&sched, &job, NULL, 2, 1);
+
+while (!ic_co_scheduler_is_done(&sched))
+{
+    ic_co_scheduler_tick(&sched);
+}
+```
+
 ## Library Overview
 IronCLib is split into small, independent headers. You can use any part on its own - but they are designed to be adopted gradually based on your needs.
 
@@ -205,7 +224,6 @@ Helpful tools that solve specific problems but don’t require architectural cha
 - `ic_bounded_loop.h`
 - `ic_typenum.h`
 - `ic_num_cast.h`
-- `ic_concurrency.h` and `ic_concurrency_signal.h`
 
 ### Architectural patterns (adopt deliberately)
 These introduce stronger design patterns and are most effective when used consistently across a module or project.
@@ -214,6 +232,13 @@ These introduce stronger design patterns and are most effective when used consis
 - `ic_result.h`
 
 > *Note: IronCLib works best when adopted consistently within a module. Start small, don’t adopt everything at once, and expand only where it adds value.*
+
+### Multitasking systems
+Tools for running tasks across threads or scheduling step-based jobs in a single thread.
+
+- `ic_concurrency.h`
+- `ic_concurrency_signal.h`
+- `ic_co_job.h`
 
 ## Read more?
 This document is only a quick intro.
@@ -260,6 +285,5 @@ All headers are verified against:
 All configurations above are verified on Windows x86_64.
 
 # TODO
-- Add CoJobs (make array of runnable jobs for performance with many jobs)
 - Test on Linux platform as well
 - Add C++ compatability guards?
