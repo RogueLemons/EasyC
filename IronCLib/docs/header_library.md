@@ -890,6 +890,158 @@ This ensures consistent behavior across platforms while keeping the implementati
 - Do not ignore return codes from initialization and threading functions.
 - Do not assume thread scheduling or execution order; always design for concurrency correctness.
 
+## ic_co_job.h
+A lightweight cooperative multitasking system for single-threaded execution.
+
+It provides:
+- `ic_co_job` as a sequence of ordered steps (function pointers)
+- `ic_co_scheduler` for scheduling and interleaving multiple jobs
+- Incremental execution via `ic_co_scheduler_tick`
+- Priority-based selection of the next step to execute
+- Weighted execution budgets (“credits”) per scheduling cycle
+
+Jobs are defined as simple ordered lists of functions (void (*)(void*)), and are executed step-by-step rather than all at once. The scheduler distributes execution across jobs using a scoring system that balances priority, remaining credits, and progress.
+
+### Why use this?
+It exists because many systems need asynchronous or staged execution without the overhead or complexity of OS threads. This abstraction makes it possible to split work into small deterministic steps and interleave execution across multiple jobs in a controlled way. This results in smoother frame-based execution, predictable scheduling, and reduced blocking in single-threaded environments.
+
+Unlike thread-based concurrency, execution is fully deterministic and runs in the calling thread, making it suitable for game loops, embedded systems, and real-time update pipelines.
+
+### Example
+
+```c
+#include "ironclib/ic_co_job.h"
+
+/* ===== Asset loading job ===== */
+
+typedef struct AssetLoadData
+{
+    int texture_id;
+    int mesh_id;
+} AssetLoadData;
+
+static void load_textures(void* data)
+{
+    AssetLoadData* d = (AssetLoadData*)data;
+    d->texture_id += 1; // simulate loading step
+}
+
+static void load_meshes(void* data)
+{
+    AssetLoadData* d = (AssetLoadData*)data;
+    d->mesh_id += 1; // simulate loading step
+}
+
+static ic_co_job make_asset_loading_job(void)
+{
+    return IC_MAKE_CO_JOB(load_textures, load_meshes);
+}
+
+/* ===== Simulation update job ===== */
+
+typedef struct SimulationData
+{
+    int physics_ticks;
+    int entity_updates;
+} SimulationData;
+
+static void physics_step(void* data)
+{
+    SimulationData* d = (SimulationData*)data;
+    d->physics_ticks++;
+}
+
+static void entity_update_step(void* data)
+{
+    SimulationData* d = (SimulationData*)data;
+    d->entity_updates++;
+}
+
+static void make_simulation_job(void)
+{
+    return IC_MAKE_CO_JOB(physics_step, entity_update_step);
+}
+
+int main(void)
+{
+    ic_co_scheduler sched = ic_make_co_scheduler();
+
+    // data not owned by job itself
+    AssetLoadData asset_data = { .texture_id = 0, .mesh_id = 0 };
+    ic_co_job asset_loading_job = make_asset_loading_job();
+    ic_co_scheduler_add_job(&sched, &asset_loading_job, &asset_data, 2, 1); // priority is 2, 1 step per cycle
+
+    // data not owned by job itself
+    SimulationData sim_data  = { .physics_ticks = 0, .entity_updates = 0 };
+    ic_co_job simulation_job = make_simulation_job();
+    ic_co_scheduler_add_job(&sched, &simulation_job, &sim_data, 1, 1);  // lower priority
+
+    // run scheduled jobs to completion
+    while (!ic_co_scheduler_is_done(&sched))
+    {
+        ic_co_scheduler_tick(&sched);
+    }
+
+    return 0;
+}
+```
+
+> *Note: Scoring can be overridden, yet default is `score = priority * credits - steps` which causes interleaving (desired) and can cause a lower priority job with high weight to go first.*
+
+### Conceptual Model
+Each job progresses independently through its own ordered sequence of steps:
+
+```
+Job A: step 0 → step 1 → step 2 → done
+Job B: step 0 → step 1 → done
+Job C: step 0 → step 1 → step 2 → step 3 → done
+```
+
+The scheduler does **not** run one entire job at a time. Instead, each call to ic_co_scheduler_tick executes exactly one step from the currently selected job.
+
+A possible execution order could look like:
+
+```
+tick 1  → Job A step 0
+tick 2  → Job B step 0
+tick 3  → Job A step 1
+tick 4  → Job C step 0
+tick 5  → Job A step 2
+tick 6  → Job B step 1
+tick 7  → Job C step 1
+```
+
+The exact order depends on:
+
+- job priorities
+- remaining credits (weights)
+- current progress (state)
+- the configured `IC_CO_SCORE` macro
+
+The scheduler repeatedly:
+
+1. Rebuilds runnable jobs when credits reset
+2. Refills credits from job weights
+3. Picks the best next job using the score function
+4. Executes one step from that job
+
+This creates a deterministic cooperative scheduling model without preemption or OS threads.
+
+### What NOT to do
+- Do not assume real parallel execution; everything runs on a single thread.
+- Do not rely on exact scheduling order unless you control all priorities and weights.
+- Do not use long-running steps; jobs are intended to be small and incremental.
+- Do not modify job state externally while it is being scheduled unless explicitly designed for it.
+
+### Why this design?
+`ic_co_job` consists of multiple `ic_co_step` functions using the signature `void step_func(void* data)`. Other coroutine-style designs were considered, such as a single linear function using a signature such as `void step_func(int step, void* data, int* is_done)` or a dynamic state-machine approach using something such as `void step_func(void* data, step_func* next_step)`. These are valid designs with their own benefits, but IronCLib prioritizes safety and predictability over flexibility.
+
+The alternative approaches require more care from the user. What happens if `is_done` is never set? Will users remember that code before and after an internal `switch(step)` executes on every call? If `is_done` is removed entirely, will users always provide the correct expected step count separately? Dynamic state-machine designs are even more flexible, but they also introduce branching execution paths that can loop forever or become difficult to reason about. Systems built this way often need additional cancellation, escape, or watchdog mechanisms to guarantee termination and maintain control over execution. The issue is not that these designs are inherently wrong, because they are not, but that they rely more heavily on disciplined usage, while this library tries to reduce the dangers of using disciplined code *instead of* safe code.
+
+With `ic_co_job`, many of these concerns are handled directly by the API. Each step executes exactly once, in a fixed order, making execution easier to reason about. When the steps are written sequentially in source code, the result resembles one large function divided into explicit stages while still allowing scheduling between jobs. Jobs also have a fixed maximum number of steps and always execute linearly from start to finish, intentionally trading flexibility for a model that is easier to analyze, debug, and trust.
+
+> *Note: For the upcoming SteelCLib, some version of the linear `void step_func(int step, void* data, int* is_done)` and dynamic `void step_func(void* data, step_func* next_step)` are likely to be included, with safety features of their own.*
+
 ## Using in your system
 For more reading on how to use this library in your application, [go here](using_in_your_system.md).
 

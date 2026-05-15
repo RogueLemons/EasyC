@@ -4,10 +4,26 @@
 #include <stddef.h>
 #include "ic_inline.h"
 
+/*
+Compatibility:
+    - C99+ supported
+    - IC_MAKE_CO_JOB(...) relies on variadic macro argument expansion and supports 
+      up to IC_CO_MAX_STEPS entries (default 10). While this works on modern C99 
+      compilers including GCC, Clang, and MSVC, some older or non-conforming 
+      preprocessors may handle variadic macro expansion differently. 
+    - For maximum portability, jobs can always be constructed manually with 
+      ic_make_co_job and ic_co_job_add_step instead of using the macro shortcut.
+*/
+
 // ========== API ==========
+//
+//  #ifndef IC_CO_MAX_STEPS
+//  #ifndef IC_CO_MAX_JOBS
+//  #ifndef IC_CO_BAD_CALL_CAPTURE
+//
 // typedef function pointer: ic_co_step                             [ void func(void* data) ]
-// typedef struct:          ic_co_job                               [ job consists of multiple steps ]
-// typedef struct:          ic_co_scheduler                         [ schedules steps across multiple jobs ]
+// typedef struct:           ic_co_job                              [ job consists of multiple steps ]
+// typedef struct:           ic_co_scheduler                        [ schedules steps across multiple jobs ]
 //
 // IC_MAKE_CO_JOB(step1, step2, step3, ...)                         [ returns an ic_co_job, supports up to 10 steps ]
 // ic_co_job ic_make_co_job(void)                                   [ returns an initialized, empty job ]
