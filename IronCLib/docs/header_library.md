@@ -17,6 +17,7 @@ The library uses macros in three ways: 1) provide small, necessary, and practica
   * [ic_bounded_loop.h](#ic_bounded_looph)
   * [ic_num_cast.h](#ic_num_casth)
   * [ic_concurrency.h](#ic_concurrencyh)
+  * [ic_co_job.h](#ic_co_jobh)
 * [Using in your system](#using-in-your-system)
 
 ## ic.h
@@ -140,6 +141,35 @@ static const Status Status_Error = {1};
 - Do not mix different underlying types for the same typenum across translation units.
 - Do not assume values are inherently safe; typenum enforces correct usage through its functions, but the underlying struct can still be modified incorrectly by user code.
 
+### Why this design?
+Enum-like types in C can also be represented using singleton pointer values, such as:
+
+```c
+typedef const struct ColorTag* Color;
+
+extern const struct ColorTag g_color_red_obj;
+extern const struct ColorTag g_color_blue_obj;
+
+#define COLOR_RED  (&g_color_red_obj)
+#define COLOR_BLUE (&g_color_blue_obj)
+```
+
+This gives strong identity via pointer comparison (c == COLOR_BLUE) and allows extensible, metadata-rich values. However, it introduces pointer semantics, requires strict separation between header declarations and source definitions, and depends on correct linkage across translation units. If the implementation uses static objects in the source file, that directly conflicts with the extern declarations in the header, since static gives internal linkage and prevents the intended cross-file identity model (this solution would instead require `Color get_color_red(void)` in header, wrapped in the macro for enum-like syntax).
+
+In contrast, ic_typenum.h wraps the underlying value in a small typed struct:
+
+```c
+typedef struct {
+    int Status_value;
+} Status;
+
+static const Status Status_Ok   = {0};
+static const Status Status_Error = {1};
+static const Status Status_Blue  = {2};
+```
+
+This preserves value semantics while enforcing a distinct type per enum and keeping everything self-contained in a single header, avoiding cross-translation-unit coordination and linker dependency issues. The tradeoff is an additional abstraction layer: values are wrapped in structs and must be accessed through generated helpers rather than used as raw integers.
+
 ## ic_opaque_storage.h
 A tiny, portable opaque-struct system for C that enables encapsulation while still allowing stack allocation.
 
@@ -225,6 +255,34 @@ typedef struct {
 - Do not use IC_OPAQUE_STORAGE in header without IC_OPAQUE_IMPL_ASSERT in the source.
 - Do not access internal data fields directly from user code.
 
+### Why this design?
+When implementing opaque-like types in C, there are several common approaches, each with different tradeoffs.
+
+One approach is using a forward-declared struct with heap allocation:
+
+```c
+typedef struct Color Color;
+
+Color* color_create(void);
+void   color_destroy(Color*);
+```
+
+This provides true encapsulation and ABI stability since users never see the struct layout. It also makes future evolution easier because cleanup logic can later be added inside destroy without changing the API. The downside is mandatory heap allocation, pointer indirection, and explicit ownership management. The benefit is simplicity: this pattern is already easy to implement without special tooling.
+
+Another approach is exposing a public struct with an internal _private member:
+
+```c
+typedef struct {
+    struct {
+        int r, g, b;
+    } _private;
+} Color;
+```
+
+This preserves stack allocation, value semantics, and debugger visibility while remaining simple enough to manage manually. In practice, this style works best with getters and setters implemented in source files (no macros!) so normal code never directly references `_private`. Seeing `_private` in code should act as a warning that internal state is being bypassed intentionally. The downside is that encapsulation is convention-based rather than enforced.
+
+`ic_opaque_storage.h` exists for cases where both stack allocation and hidden implementation are desired simultaneously. It combines the main advantages of both approaches, but at the cost of additional complexity through explicit size/alignment declarations and validation macros.
+
 ## ic_result.h
 A tiny, portable `Result<T, E>` style type for C with explicit error handling and controlled propagation.
 
@@ -298,6 +356,11 @@ IC_HEADER_FUNC CharResult CharResult_err(int e) {
 ### What NOT to do
 - Do not ignore `.ok` and directly access `.data` without checking success.
 - Do not use Result types as a replacement for validation logic (they are for propagation, not input checking).
+
+### Why this design?
+A union is used internally because the generated result type supports arbitrary user-defined value and error types, meaning the library cannot make assumptions about their size or layout. Since only one side of the result is valid at a time (`value` or `error`), a union allows both to share the same storage and reduces the overall size of the result struct.
+
+Another possible design is storing both the value and error separately without a union and determining success entirely from the error state, e.g. by requiring a dedicated Error_NoError value. This avoids inactive-union-member semantics and allows both fields to always contain valid dummy data, but increases the size of the result type when the error type is large since both values must exist simultaneously, and also requires the user’s error system to define a dedicated no-error state.
 
 ## ic_memory.h
 A tiny, portable memory and alignment abstraction layer for C.
@@ -529,6 +592,11 @@ static inline int32_t cast_uint32_t_to_int32_t(const uint32_t v)
     return (int32_t)(v > INT32_MAX ? INT32_MAX : v);
 }
 ```
+
+### Why this design?
+Numeric casting can be implemented using more modular function-pointer based systems where conversions are selected and composed at runtime. While flexible, this shifts responsibility for correct casting semantics to the user, since safety and consistency are no longer enforced by a fixed structure. At that point, much of the benefit of a generated cast system is lost, because correctness depends on manual wiring rather than guaranteed rules.
+
+`ic_num_cast.h` instead generates explicit conversion functions from a user-defined type matrix, ensuring all casts are known at compile time and behave deterministically. It avoids error-return APIs because they introduce branching and decision points exactly where the programmer is already reasoning about numeric edge cases. The goal is to reduce cognitive load: casting should be a predictable operation, not another layer of logic to manage.
 
 ## ic_concurrency.h
 A small, portable concurrency abstraction layer for C, providing atomics, threads (tasks), mutexes, and sleep functionality.
@@ -771,7 +839,7 @@ int main(void)
 }
 ```
 
-The order of woken up tasks waiting on an `ic_gate` is arbitrary. Worker 2 can be woken by Signal 1 for instance. The gate is also lossless, meaning that signals sent ahead of time are stored as permits for future waiting threads to immediately continue.
+The order of woken up tasks waiting on an `ic_gate` is random. Worker 2 can be woken by Signal 1 for instance. The gate is also lossless, meaning that signals sent ahead of time are stored as permits for future waiting threads to immediately continue.
 
 ```c
 #include <stdio.h>
@@ -848,6 +916,13 @@ The broadcast signals all waiting threads and will let all future waiting thread
 
 #### More documentation in header itself
 The [ic_concurrency.h file](../ironclib/ic_concurrency.h) and [ic_concurrency_signal.h files](../ironclib/ic_concurrency.h) contain a larger API than most other headers in this library. All headers included commented documentation directly in the library headers but this one is extra worthwhile to have a look at.
+
+#### Why this design (for signals)?
+All signal types are ultimately built on condition variables, and ic_condition_variable exists to expose that low-level primitive with minimal abstraction for cases where full control is needed. However, correct usage requires careful mutex coordination and signaling discipline, which is easy to get wrong in practice.
+
+To reduce misuse, `ic_gate` and `ic_broadcast` provide safer, higher-level patterns. A gate wakes one waiting thread per signal, while a broadcast releases all waiters and keeps the signal active for future waiters until reset. They are kept as separate types because they represent fundamentally different behaviors: a gate is a one-time "pass one thread" mechanism, while a broadcast is a persistent "allow all through" state. Merging them into one abstraction would make the rules harder to reason about and easier to misuse. 
+
+If both behaviors are needed together, the rules for building a combined `Passpoint` are defined in the [using_in_your_system.h](using_in_your_system.md#merging-gates-and-broadcasts). It combines multiple synchronization behaviors and is intended for cases where these semantics are already well understood. If this model is not clear, it is recommended to use `ic_gate` or ic_broadcast directly.
 
 ### Conceptual Expansion
 
