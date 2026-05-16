@@ -16,7 +16,7 @@ The library uses macros in three ways: 1) provide small, necessary, and practica
   * [ic_memory.h](#ic_memoryh)
   * [ic_bounded_loop.h](#ic_bounded_looph)
   * [ic_num_cast.h](#ic_num_casth)
-  * [ic_concurrency.h](#ic_concurrencyh)
+  * [ic_concurrency.h and ic_concurrency_signal.h](#ic_concurrencyh)
   * [ic_co_job.h](#ic_co_jobh)
 * [Using in your system](#using-in-your-system)
 

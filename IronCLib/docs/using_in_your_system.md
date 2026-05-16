@@ -747,6 +747,202 @@ Error passpoint_open_and_signal_all(Passpoint* p);  // GATED: wakes all and swit
 Error passpoint_set_gated(Passpoint* p);            // OPEN: Switch back to GATED mode (sticky), permits = 0; GATED: no-op
 ```
 
+## Good practices for co-jobs
+A good first step when using co-jobs is to centralize configuration macros in a single header that is included everywhere the scheduler is used. This ensures consistent limits and scoring behavior across the entire codebase, and prevents subtle mismatches between translation units.
+
+```c
+// my_app_ic_co_job.h
+
+#define IC_CO_MAX_STEPS 20
+#define IC_CO_MAX_JOBS 5
+
+#ifdef IC_CO_SCORE
+#error IC_CO_SCORE is already defined (conflicting configuration)
+#endif
+
+#define IC_CO_SCORE(priority, credits, state) ((priority) + (credits) + (state))
+
+#include "ironclib/ic_co_job.h"
+```
+
+A single global scoring function is often enough for most systems, and is the simplest and most predictable option. However, it is also valid to define different scoring strategies in different source files if the system benefits from local scheduling behavior. In that case, each override must be explicit and must fail loudly if it does not take effect (as shown above), ensuring that no silent fallback behavior is introduced.
+
+### Creating co-jobs
+There are three supported ways, each intended for a different usage pattern.
+
+> *Note: Once constructed, a job is considered immutable and should not be modified after being added to a scheduler.*
+
+#### Static const job using IC_MAKE_CO_JOB
+
+For small fixed jobs, the simplest approach is to define a static const job directly with the macro:
+
+```c
+// job.h
+#include "my_app_ic_co_job.h"
+
+struct ProcessingJobData
+{
+    int i;
+};
+typedef struct ProcessingJobData ProcessingJobData;
+
+const ic_co_job* get_processing_job(void);
+// job.c
+#include "job.h"
+#include <stdio.h>
+
+static void processing_job_step_1(void* data);
+static void processing_job_step_2(void* data);
+static void processing_job_step_3(void* data);
+
+static const ic_co_job g_processing_job = IC_MAKE_CO_JOB(
+    processing_job_step_1,
+    processing_job_step_2,
+    processing_job_step_3
+);
+
+const ic_co_job* get_processing_job(void)
+{
+    return &g_processing_job;
+}
+```
+
+This approach is compact, efficient, and works well when the job structure is known entirely at compile time.
+
+> *Note: IC_MAKE_CO_JOB supports a maximum of 10 steps. For larger or dynamically assembled jobs, use runtime construction instead.*
+
+#### Static job with explicit initializer
+A job can also be stored as static storage and initialized in a dedicated setup function:
+
+```c
+// job.c
+#include "job.h"
+#include <stdio.h>
+
+static void processing_job_step_1(void* data);
+static void processing_job_step_2(void* data);
+static void processing_job_step_3(void* data);
+
+static ic_co_job g_processing_job;
+
+void init_processing_job(void)
+{
+    g_processing_job = ic_co_job_create();
+
+    ic_co_job_add_step(&g_processing_job, processing_job_step_1);
+    ic_co_job_add_step(&g_processing_job, processing_job_step_2);
+    ic_co_job_add_step(&g_processing_job, processing_job_step_3);
+}
+
+const ic_co_job* get_processing_job(void)
+{
+    return &g_processing_job;
+}
+```
+
+This is useful when the job must be assembled conditionally or configured during startup while still remaining globally reusable.
+
+#### Dynamic job creation
+The most portable and explicit way to construct jobs is through runtime construction. This allows jobs to be created whenever they are needed, without relying on preprocessor generation. It is the most flexible model and works well when jobs are data-driven or instantiated multiple times.
+
+```c
+ic_co_job make_processing_job(void)
+{
+    ic_co_job job = ic_co_job_create();
+
+    ic_co_job_add_step(&job, processing_job_step_1);
+    ic_co_job_add_step(&job, processing_job_step_2);
+    ic_co_job_add_step(&job, processing_job_step_3);
+
+    return job;
+}
+```
+
+### Data ownership rule
+The scheduler never allocates, frees, or assumes ownership of user-provided data in any model. A consistent ownership model for job data should be chosen per system. The scheduler itself never owns job data; it only stores and forwards a `void*` context pointer during execution. This means the lifetime and responsibility of the data must always be defined externally by the user. Here are two good options:
+
+#### Job-managed data model
+The job conceptually owns and manages its own state, even if the actual memory storage is provided externally by the caller. Initialization, updates, and cleanup logic are handled entirely by the job steps themselves. This keeps the job self-contained and makes future edits easier, since new internal state and setup behavior can be added without changing how the rest of the system interacts with the job.
+
+#### Externally managed data model
+The data is created and destroyed outside the job using explicit constructor/destructor-style functions:
+
+```c
+ProcessingJobData make_processing_job_data(void);
+void destroy_processing_job_data(ProcessingJobData*);
+```
+
+This makes ownership and lifetime fully explicit, and most importantly allows fully configured data to be passed into the job before scheduling. This is useful when jobs depend on external configuration, shared state, or runtime-generated input. The tradeoff is that the caller must now coordinate setup and cleanup correctly. Even if destruction is currently trivial, defining a destroy function (or an empty macro with same signature) from the beginning keeps the ownership model stable and allows cleanup behavior to evolve later without requiring changes to calling code.
+
+### Running scheduler to completion and cooperative early exit
+Jobs are designed to run to completion, and normally execute inside a scheduler loop such as:
+
+```c
+while (!ic_co_scheduler_is_done(&sched))
+{
+    ic_co_scheduler_tick(&sched);
+
+    if (ic_co_scheduler_credits(&sched) == 0)
+    {
+        // End of scheduler cycle
+    }
+}
+```
+
+The scheduler itself does not provide forced cancellation or emergency abort behavior. Supporting hard cancellation would require either additional cleanup callbacks or more complex step function signatures, imposing assumptions and overhead on every job regardless of whether cancellation is needed.
+
+Instead, early termination is expected to be handled cooperatively through shared job state; it is not a cancellation mechanism. Since each step already receives user-controlled data through the `void*` context pointer, jobs can observe external state between steps and simply perform no further work when an abort condition has been signaled.
+
+This model treats a co-job as a single larger operation divided into resumable steps, rather than as a collection of unrelated functions. The scheduler controls when execution advances, while the job itself controls whether meaningful work should continue. A practical pattern is to store shared execution state in a single struct that is visible to all participating jobs:
+
+```c
+typedef struct SharedData
+{
+    int x, y, z;
+    bool abort;
+    bool failure_detected;
+} SharedData;
+
+bool run_processing_sequence(int x, int y, int z)
+{
+    SharedData shared_data = {
+        .x = x,
+        .y = y,
+        .z = z,
+        .abort = false,
+        .failure_detected = false
+    };
+
+    ic_co_scheduler sched = ic_make_co_scheduler();
+    ic_co_scheduler_add_job(&sched, get_job_a(), &shared_data, 1, 1);
+    ic_co_scheduler_add_job(&sched, get_job_b(), &shared_data, 1, 1);
+
+    while (!ic_co_scheduler_is_done(&sched))
+    {
+        ic_co_scheduler_tick(&sched);
+
+        if (shared_data.abort)
+        {
+            break;
+        }
+    }
+
+    if (shared_data.abort)
+    {
+        // Allow remaining jobs to observe abort state
+        const int steps_per_cycle = 2; // weight of all jobs combined in THIS example
+        for (int i = 0; i < steps_per_cycle; i++)
+        {
+            ic_co_scheduler_tick(&sched);
+        }
+    }
+
+    return shared_data.failure_detected;
+}
+```
+
+The scheduler is not stopped on abort so that remaining steps can observe and react to the updated state. In this model, jobs remain structurally complete while still supporting coordinated shutdown behavior. Abort handling stays explicit, local to the shared state model, and fully under application control rather than being embedded into the scheduler itself.
+
 ## What NOT to do
 - Do not mix raw C implementation patterns (malloc, enums, structs) with IronCLib abstractions within the same architectural layer; each layer should follow a single, consistent paradigm. Once IronCLib is used within a module, it should be applied consistently. Ownership, data flow, and error handling should follow a unified convention throughout that module.
 - Do not bypass result types for convenience, as this can weaken the explicit error model.

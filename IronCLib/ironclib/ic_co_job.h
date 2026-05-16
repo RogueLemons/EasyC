@@ -17,9 +17,10 @@ Compatibility:
 
 // ========== API ==========
 //
-//  #ifndef IC_CO_MAX_STEPS
-//  #ifndef IC_CO_MAX_JOBS
-//  #ifndef IC_CO_BAD_CALL_CAPTURE
+// #ifndef IC_CO_MAX_STEPS
+// #ifndef IC_CO_MAX_JOBS
+// #ifndef IC_CO_BAD_CALL_CAPTURE
+// #ifndef IC_CO_SCORE
 //
 // typedef function pointer: ic_co_step                             [ void func(void* data) ]
 // typedef struct:           ic_co_job                              [ job consists of multiple steps ]
