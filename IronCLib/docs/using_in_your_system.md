@@ -10,6 +10,7 @@ The following sections include topics for using IronCLib in a code base. This is
 * [Write with rules for structs and opaque storage](#write-with-rules-for-structs-and-opaque-storage)
 * [Make it your own](#make-it-your-own)
 * [Decouple from library and make a thread pool](#decouple-from-library-and-make-a-thread-pool)
+* [Good practices for co-jobs](#good-practices-for-co-jobs)
 * [What NOT to do](#what-not-to-do)
 
 ## Create a standardized, type-safe error system
